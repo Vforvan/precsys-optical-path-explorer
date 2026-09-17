@@ -23,6 +23,8 @@ SCANLAB **precSYS** 五轴（X / Y / Z / α / β）激光微加工扫描头的**
 - α、β 模块如何让输出光束**保持平行但产生横向位移**；
 - 光束偏心进入物镜后，为什么**焦点基本不动、入射方向却变了**；
 - Z 轴如何通过改变**物镜前光束的会聚状态**移动焦点；
+- 为什么 Z 模块的折返镜**没有自己的执行轴、却每帧都在转**（随动解算）；
+- 为什么真实机械角常常小到肉眼看不出来，以及页面用什么方式把它显示出来；
 - 为什么五个执行轴**必须联合标定**，而不是一轴对应一个坐标；
 - 进动钻孔时**哪些镜片在动**、哪些部件没有旋转；
 - 直壁 / 正锥 / 负锥分别对应怎样的焦点轨迹与入射角策略。
@@ -37,7 +39,7 @@ npm run dev        # 开发服务器（默认 http://localhost:5173）
 npm run build      # 生成单文件 dist/index.html（tsc 类型检查 + 构建 + 内联），并同步到 docs/
 npm run build:split# 生成传统分离文件版（需要本地服务器）
 npm run preview    # 本地预览构建产物
-npm test           # 运行 Vitest 单元测试（66 个用例）
+npm test           # 运行 Vitest 单元测试（76 个用例）
 npm run check      # 只做 TypeScript 类型检查
 npm run verify:page# 用真实浏览器自检"双击打开"能否正常启动（需要 Edge/Chrome）
 ```
@@ -158,6 +160,11 @@ d_reflected = d − 2·(d·n)·n
   这样"高亮某个轴、其余降透明度"不会互相干扰，镜片边界也始终清晰。
 - 物镜原来是两段饱和紫蓝色的空心大圆筒，看起来像"悬在光路上的胶囊"；
   现在改为中性玻璃灰蓝的三段镜筒 + 金属加强环 + 内部镜组 + 出光口。
+- **Z 模块两块镜片粘在一起（穿模）**：折转镜与折返镜的落差原来只有 16 mm，
+  而两片 20 mm 的 45° 镜片各自的 Z 向半投影约 14 mm，屏幕上看就是两块镜片互相穿插。
+  现在落差取 34 mm，并加了 `geometry-overlap.test.ts` 用 OBB 判定做回归保护。
+- **随动折返镜"凭空自己动"**：它没有执行轴却每帧在转，因为法向是解出来的。
+  现在为它补了一台电机，读数用本帧解出的法向求带符号角（见 4.3）。
 - 排查这类"有东西挡住画面"的问题时，可以用 `node tools/diagnose-occlusion.mjs`：
   它会拍默认视角、逐个隐藏分组（`window.__PRECSYS__.groups`）各拍一张，便于按排除法定位。
 
@@ -191,6 +198,16 @@ d_reflected = d − 2·(d·n)·n
 - 变焦反射镜曲率随执行器信号在**凸—平—凹**之间变化，直接实现"改变物镜前光束会聚度"，
   输出会聚度 = 2·cos(入射角)/R；
 - ±1 mm 焦点范围只需约 ±0.8° 执行器角。
+
+**关于折返镜的"随动"**：折返镜没有自己的执行轴，它的法向是每帧被解出来的，
+因此页面给它单独画了一台电机，读数用**本帧解出的法向相对名义法向的带符号角**
+（不能用执行器角驱动，否则显示出来的角度是错的）。这也是页面上会出现
+**6 台电机**的原因：5 个执行轴 + 1 台 Z 随动折返镜。
+
+**关于角度指示弧（×12）**：Z 轴走完 ±1 mm 全程只需要约 ±0.8°，
+转子上的键位在这个量级下肉眼等同静止。因此每台电机额外画一段
+**放大 12 倍显示**的指示弧，方向与转向一致，标签上标注 `×12`。
+它只是读数指示，**不参与任何光学计算**，镜片姿态与光线仍按真实角度计算。
 
 页面固定显示：
 
@@ -262,8 +279,18 @@ d_reflected = d − 2·(d·n)·n
 precsys-optical-path-explorer/
 ├─ index.html                  页面骨架（顶栏 / 视口 / 侧栏 / 控制栏）
 ├─ package.json  vite.config.ts  tsconfig.json
+├─ .gitignore  .gitattributes  忽略构建中间产物 / 统一换行符
+├─ LICENSE  NOTICE.md          MIT 正文 / 第三方组件与商标声明
+├─ docs/                       GitHub Pages 发布目录（构建产物，勿手改）
 ├─ public/references/README.md 资料目录说明
-├─ tools/screenshot.mjs        用 Playwright 生成页面截图（可选）
+├─ tools/
+│  ├─ build-standalone.mjs     单文件构建 + 同步到 docs/
+│  ├─ check-file-open.mjs      自检"双击打开"能否启动
+│  ├─ verify-demo.mjs          五种工艺预设与布局回归（浏览器）
+│  ├─ check-motors.mjs         电机显示角是否等于执行器角、是否装在镜片上
+│  ├─ check-mirror-response.mjs 电机角度是否真的反映到镜片姿态上
+│  ├─ screenshot.mjs           用 Playwright 生成页面截图（可选）
+│  └─ diagnose-occlusion.mjs   逐个隐藏分组排查"什么东西挡住了画面"
 └─ src/
    ├─ main.ts                  入口：状态 → 追迹 → 场景 → 界面
    ├─ app-state.ts             两层状态（工程量 / 执行器量）与快照
@@ -290,22 +317,32 @@ precsys-optical-path-explorer/
    │  ├─ create-beam.ts        光束折线、包络、幽灵光路、焦点、尾迹
    │  ├─ create-housing.ts     外壳、电子学、水冷、吹扫、外围系统
    │  ├─ create-workpiece.ts   工件、孔、去除环、工件坐标轴
+   │  ├─ galvo-motor.ts        电机外观、转子、角度指示弧（×12 放大）
+   │  ├─ cumulative-workpiece.ts 累积体素去除网格
    │  └─ labels.ts             CSS2D 部件标签
+   ├─ simulation/
+   │  └─ material-removal.ts   体素材料去除模型
    ├─ ui/
    │  ├─ controls.ts           模式切换、控制栏、读数面板
    │  ├─ component-info.ts     部件信息卡与资料来源
+   │  ├─ material-detail.ts    材料去除三维局部视图
+   │  ├─ process-presets.ts    加工库面板与实时读数
    │  └─ labels-text.ts        动态说明文字
    └─ tests/
       ├─ reflection.test.ts    反射定律、平面求交、包络传播
       ├─ parallel-shift.test.ts 四次反射、方向不变、位移与缺口净空
       ├─ objective.test.ts     物镜等效关系与公开规格自洽性
       ├─ optical-train.test.ts 全链路追迹与联合逆映射
+      ├─ geometry-overlap.test.ts 同模块镜片实体互不穿插（OBB）
+      ├─ material-removal.test.ts 累积去除与切削轨迹一致性
+      ├─ demo-regression.test.ts 五种预设全周期光路回归
+      ├─ probe-hits.test.ts    打印各拐点实际入射角（排查用）
       └─ precession.test.ts    四种加工模式与进动轨迹
 ```
 
 ---
 
-## 8. 测试覆盖（`npm test`，52 个用例）
+## 8. 测试覆盖（`npm test`，76 个用例 / 9 个文件）
 
 - 反射方向与法向定向无关、镜面转 δ 反射光变化 2δ、光线-平面求交；
 - α/β 模块：四次反射落点、首末命中同一可动镜组、**输出方向偏差 < 1e-9 度**、
@@ -315,6 +352,9 @@ precsys-optical-path-explorer/
 - 全链路：零位焦点在原点、光路顺序正确、X 振镜不引入偏心、
   Y 振镜与 Z 执行器的耦合确实存在、±7.5° AOI 与 ±1 mm 焦点都在行程内可达、
   补偿开启后六组工况残差 < 0.01；
+- 几何互不穿插（`geometry-overlap`）：用 OBB 判定同模块内各镜片在零位与
+  两个极端执行器状态下都不相交，并对 Z 模块镜间距的最小值做断言 ——
+  这条是为"折转镜与折返镜穿模"回归加的；
 - 加工：四种模式行为、进动相位锁定、倾斜幅值、螺距推进、慢放换算。
 
 ---
