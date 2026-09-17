@@ -2,6 +2,9 @@
 
 SCANLAB **precSYS** 五轴（X / Y / Z / α / β）激光微加工扫描头的**教学型三维光路交互模型**。
 
+**在线访问：<https://vforvan.github.io/precsys-optical-path-explorer/>** —— 用手机、平板或电脑浏览器打开即可，无需安装任何东西。
+（也可以离线使用：`npm run build` 产出的单个 `dist/index.html` 双击就能跑，见第 2 节。）
+
 > 这是一个**教学型工程示意模型**，不是对 precSYS 实机的拆机复刻、CAD 逆向或加工仿真器。
 > 内部光路采用公开专利和官方资料建立的教学型等效模型。模块功能和光学关系可信，
 > 具体封装、尺寸及部分 Z 轴结构不代表生产设备内部实物。
@@ -28,13 +31,24 @@ SCANLAB **precSYS** 五轴（X / Y / Z / α / β）激光微加工扫描头的**
 ```bash
 npm install        # 安装依赖（three / vite / vitest / typescript）
 npm run dev        # 开发服务器（默认 http://localhost:5173）
-npm run build      # 生成单文件 dist/index.html（tsc 类型检查 + 构建 + 内联）
+npm run build      # 生成单文件 dist/index.html（tsc 类型检查 + 构建 + 内联），并同步到 docs/
 npm run build:split# 生成传统分离文件版（需要本地服务器）
 npm run preview    # 本地预览构建产物
-npm test           # 运行 Vitest 单元测试（52 个用例）
+npm test           # 运行 Vitest 单元测试（66 个用例）
 npm run check      # 只做 TypeScript 类型检查
 npm run verify:page# 用真实浏览器自检"双击打开"能否正常启动（需要 Edge/Chrome）
 ```
+
+### 在线版与发布方式
+
+本仓库用 **GitHub Pages** 发布在线版，发布源是 `main` 分支的 `/docs` 目录：
+
+- `docs/` 是**构建产物**，由 `npm run build` 自动从 `dist/` 同步而来，请勿手工编辑；
+- 它随源码一起提交，因此线上页面和仓库内容永远对得上；
+- 改完代码后，`npm run build` → `git add` → `git commit` → `git push`，Pages 会自动重新发布。
+
+> `dist/` 与 `docs/` 内容相同，区别是 `dist/` 不入库（见 `.gitignore`），`docs/` 入库。
+> 为什么不直接让 Pages 指向 `dist/`：Pages 只能发布仓库里**已提交**的目录。
 
 ### 怎么打开（重要）
 
