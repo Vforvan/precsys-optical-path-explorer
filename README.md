@@ -1,5 +1,8 @@
 # precsys-optical-path-explorer
 
+[![在线演示](https://img.shields.io/badge/在线演示-打开页面-2ea44f?style=flat-square)](https://vforvan.github.io/precsys-optical-path-explorer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+
 SCANLAB **precSYS** 五轴（X / Y / Z / α / β）激光微加工扫描头的**教学型三维光路交互模型**。
 
 **在线访问：<https://vforvan.github.io/precsys-optical-path-explorer/>** —— 用手机、平板或电脑浏览器打开即可，无需安装任何东西。
