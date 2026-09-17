@@ -1,0 +1,28 @@
+{
+  "name": "precsys-optical-path-explorer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "precSYS 五轴硬件光路教学型三维交互模型（离线静态网页）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && node tools/build-standalone.mjs",
+    "build:split": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit",
+    "verify:page": "node tools/check-file-open.mjs",
+    "verify:demo": "node tools/verify-demo.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "playwright": "^1.63.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>precSYS 五轴硬件光路 · 交互教学模型</title>
+    <meta
+      name="description"
+      content="SCANLAB precSYS 五轴（X/Y/Z/α/β）激光扫描头的光路教学型三维交互模型：平行移束模块、振镜、动态调焦与进动加工演示。"
+    />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <!-- 内联图标：避免离线页面产生一条 favicon 404 -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0f16'/%3E%3Cpath d='M16 4v10' stroke='%23ff6a3d' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M9 13l7 7 7-7' stroke='%2322d3ee' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='26' r='2.6' fill='%23fff27a'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <!--
+      这个 div 只在"页面没能启动"时可见。最常见的两种情况：
+        1. 直接双击了源码目录的 index.html —— 浏览器无法执行 src/main.ts；
+        2. 直接双击了分离文件版的 dist/index.html —— file:// 下外链 module 脚本会被 CORS 拒绝。
+      正确做法见下面的提示文字。启动成功时 main.ts 会把它移除。
+    -->
+    <div id="boot-hint" role="alert">
+      <h2>页面没有启动</h2>
+      <p>你现在看到的只是 HTML 骨架，三维模型没有加载。常见原因与解决办法：</p>
+      <ul>
+        <li>
+          <b>双击了源码目录的 index.html</b>：浏览器不能直接运行 <code>src/main.ts</code>。<br />
+          请改为双击 <code>dist/index.html</code>（项目已按单文件方式构建，可直接打开），
+          或在本目录执行 <code>npm run dev</code> 后访问提示的网址。
+        </li>
+        <li>
+          <b>dist/index.html 打不开三维</b>：请在本目录执行 <code>npm run build</code>
+          重新生成单文件版本，或执行 <code>npx vite preview</code> 用本地服务器打开。
+        </li>
+      </ul>
+      <p class="dim">若浏览器控制台提示 CORS / MIME，属于 file:// 的固有限制，用上面的任一方式即可解决。</p>
+    </div>
+
+    <div id="app">
+      <header id="topbar">
+        <div class="brand">
+          <h1>precSYS 五轴硬件光路</h1>
+          <p class="subtitle">
+            教学型三维交互模型 · X / Y / Z / α / β 五轴激光扫描子系统
+          </p>
+        </div>
+
+        <nav id="mode-tabs" aria-label="一级模式"></nav>
+
+        <div class="trust-legend" aria-label="信息可信等级">
+          <span class="badge badge-public">公开确认</span>
+          <span class="badge badge-patent">专利原理</span>
+          <span class="badge badge-edu">教学等效</span>
+        </div>
+      </header>
+
+      <section id="disclaimer" class="disclaimer" role="note">
+        内部光路采用公开专利和官方资料建立的教学型等效模型。模块功能和光学关系可信，具体封装、尺寸及部分
+        Z 轴结构不代表生产设备内部实物。
+        <button id="disclaimer-close" type="button" aria-label="关闭提示">×</button>
+      </section>
+
+      <main id="layout">
+        <section id="viewport" aria-label="三维视口">
+          <div id="viewport-overlay">
+            <div id="axis-legend"></div>
+            <div id="visual-notes"></div>
+          </div>
+          <div id="tour-bubble" hidden></div>
+          <section id="material-detail" aria-label="材料去除模拟"></section>
+          <div id="hover-hint">左键拖动旋转 · 滚轮缩放 · 右键平移 · 点击部件查看说明</div>
+        </section>
+
+        <aside id="side-panel" aria-label="说明与读数">
+          <section class="panel-card" id="process-presets"></section>
+          <section class="panel-card" id="module-card"></section>
+          <section class="panel-card" id="readout-card"></section>
+          <section class="panel-card" id="part-card"></section>
+        </aside>
+      </main>
+
+      <footer id="controlbar" aria-label="控制区"></footer>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

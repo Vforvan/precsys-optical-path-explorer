@@ -1,0 +1,16 @@
+# 统一换行符：仓库内一律存 LF，检出到 Windows 时再转 CRLF。
+# 不加这一条的话，Windows 上的 git 会对每个文本文件报 "LF will be replaced by CRLF"，
+# 而一旦有人用不同配置提交，diff 里会出现"整个文件都改了"的假改动。
+* text=auto eol=lf
+
+# 二进制文件不要做任何换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# 发布产物是压缩后的单行 JS，diff 没有意义
+docs/index.html -diff linguist-generated
+dist/index.html -diff linguist-generated

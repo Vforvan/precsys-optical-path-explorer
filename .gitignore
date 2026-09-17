@@ -1,0 +1,24 @@
+# 依赖（约 97 MB，由 package.json / package-lock.json 还原）
+node_modules/
+
+# 构建中间产物
+dist/
+
+# 过程截图（约 9 MB，只在本地用于回归比对）
+screenshots/
+
+# 说明：docs/ 是"发布产物"目录，**故意纳入版本管理**。
+# 它是 npm run build 的输出副本，也是 GitHub Pages 的发布源
+# （仓库 Settings → Pages → Deploy from a branch → main / docs）。
+# 因此这里不能把 docs/ 一并忽略，否则线上页面会是 404。
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+vite.config.ts.timestamp-*
