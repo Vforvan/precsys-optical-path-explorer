@@ -33,7 +33,8 @@ const motorCount = await page.evaluate(() => {
   window.__PRECSYS__.groups.optics.traverse(o => { if (o.userData.motorAxis) count++; });
   return count;
 });
-if (motorCount !== 5) throw Error(`Expected 5 motors, got ${motorCount}`);
+// 五轴各一台电机 + Z 随动折返镜一台 = 6
+if (motorCount !== 6) throw Error(`Expected 6 motors, got ${motorCount}`);
 await page.getByRole('button', { name: '⏸ 暂停', exact: true }).click();
 const stopped = await page.evaluate(() => window.__PRECSYS__.state.theta);
 const retained = await page.evaluate(() => window.__PRECSYS__.workpiece.material.stats());

@@ -103,18 +103,9 @@ export function createFocusModule(
     interactive: true,
   };
 
-  // 折返镜：名义法向由入射方向解出（渲染姿态用，追迹时每帧重算）
-  const nominalDir2 = curvedCenter
-    .clone()
-    .add(new Vector3(0, 0, -dropMm))
-    .sub(curvedCenter)
-    .normalize();
-  void nominalDir2;
-  const foldNormal = outDir
-    .clone()
-    .sub(new Vector3(0, 0, -1))
-    .normalize()
-    .negate();
+  // 折返镜：名义法向必须与追迹里每帧解出的法向**用同一个公式**，
+  // 否则 spec.normal 与实际法向相差 180°，渲染层会把它当成"转了 179°"。
+  const foldNormal = outDir.clone().sub(new Vector3(0, 0, -1)).normalize();
   const fold: MirrorSpec = {
     id: 'z-fold',
     label: 'Z 折返镜（随动）',

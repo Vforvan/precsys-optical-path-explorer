@@ -523,6 +523,14 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
     { view: createGalvoMotor(train.betaModule.movableIn, 'β'), angle: (a: ActuatorState) => a.betaRad },
   ];
   for (const motor of motors) group.add(motor.view.group);
+
+  /**
+   * Z 折返镜也需要一台电机：它不是固定镜，而是每帧按"出射必须沿 −Z"解算法向的
+   * 随动镜，角度与执行器不同（因此不能用执行器角驱动，必须用本帧解出的姿态）。
+   * 早期它没有电机却会转，看起来像"凭空自己动"。
+   */
+  const foldMotor = createGalvoMotor(train.focusModule.fold, 'Z2 随动');
+  group.add(foldMotor.group);
   // 高亮只影响当前部件，避免与外壳、光束共用材质时互相覆盖透明度。
   group.traverse((object) => {
     if (object instanceof Mesh && !object.parent?.parent?.userData.motorAxis && !object.parent?.userData.motorAxis) {
@@ -548,6 +556,17 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
 
   const update = (actuators: ActuatorState, trace: TrainTrace) => {
     for (const motor of motors) motor.view.update(motor.angle(actuators));
+
+    // 随动折返镜的机械角：由本帧解出的法向相对名义法向求出（带符号，绕自身转轴）
+    {
+      const spec = train.focusModule.fold;
+      const axis = (spec.rotationAxis ?? spec.v).clone().normalize();
+      const n0 = spec.normal.clone().normalize();
+      const hit = trace.hits.find((h) => h.mirrorId === spec.id);
+      const n1 = hit ? hit.normal.clone().normalize() : n0;
+      const sin = n1.clone().crossVectors(n0, n1).dot(axis);
+      foldMotor.update(Math.atan2(sin, n0.dot(n1)));
+    }
     // 可动镜面：位置与朝向按刚体转动更新
     for (const part of movableParts) {
       const spec = part.spec;
