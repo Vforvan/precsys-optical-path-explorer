@@ -19,16 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-第三方组件声明
-
-本项目在构建时打包了 three.js（MIT License, Copyright © 2010-2024 three.js authors），
-其许可证文本随 node_modules/three/LICENSE 一并提供。本项目与 three.js 项目无隶属关系。
-
-商标与资料来源声明
-
-precSYS、SCANLAB 为其各自权利人的商标。本项目是公开资料的**教学型**解读与可视化，
-与上述公司无隶属关系，也未获其背书。模型中的几何与数值为面向教学的等效近似，
-不等同于整束光截光、衍射或材料烧蚀仿真，详见 README 与 public/references/README.md。
