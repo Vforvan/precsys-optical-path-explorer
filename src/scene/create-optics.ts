@@ -525,11 +525,11 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
   for (const motor of motors) group.add(motor.view.group);
 
   /**
-   * Z 折返镜也需要一台电机：它不是固定镜，而是每帧按"出射必须沿 −Z"解算法向的
+   * 教学 Z 折返镜保留随动驱动外形：它不是固定镜，而是每帧按"出射必须沿 −Z"解算法向的
    * 随动镜，角度与执行器不同（因此不能用执行器角驱动，必须用本帧解出的姿态）。
-   * 早期它没有电机却会转，看起来像"凭空自己动"。
+   * 专利未规定此结构；不能把这个示意驱动当作 precSYS 的第六轴。
    */
-  const foldMotor = createGalvoMotor(train.focusModule.fold, 'Z2 随动');
+  const foldMotor = createGalvoMotor(train.focusModule.fold, 'Z 随动示意');
   group.add(foldMotor.group);
   // 高亮只影响当前部件，避免与外壳、光束共用材质时互相覆盖透明度。
   group.traverse((object) => {

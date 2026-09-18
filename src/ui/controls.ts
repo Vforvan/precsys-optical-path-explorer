@@ -9,6 +9,7 @@ import type { AppMode, AppSnapshot, AppState, AppToggles } from '../app-state';
 import type { EngineeringCommand } from '../optics/educational-inverse-model';
 import { PROCESS_MODES, TAPER_PRESETS, type ProcessParams } from '../animation/process-modes';
 import { OPTICS_VARIANTS, PUBLIC_SPECS_UI } from '../config/ui-text';
+import { geometryStatus } from './geometry-status';
 
 export interface ControlsHandlers {
   onPlayToggle(): void;
@@ -415,6 +416,18 @@ export class Controls {
 
     this.renderModuleCard(snapshot);
     this.renderReadout(snapshot);
+    const geometryCard = document.getElementById('geometry-card');
+    if (geometryCard) {
+      const status = geometryStatus(snapshot.trace);
+      if (!geometryCard.firstElementChild) geometryCard.innerHTML = status.html;
+      const message = geometryCard.querySelector('[role="status"]');
+      if (message) {
+        message.textContent = status.message;
+        message.className = status.warning ? 'warn' : 'good';
+      }
+      const values = geometryCard.querySelector('[data-geometry-values]');
+      if (values) values.innerHTML = status.valuesHtml;
+    }
   }
 
   private renderModuleCard(snapshot: AppSnapshot): void {

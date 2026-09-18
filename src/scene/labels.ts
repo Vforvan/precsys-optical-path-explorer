@@ -67,13 +67,13 @@ export function createLabels(train: OpticalTrain): { group: Group; items: LabelE
     AXIS.beamExpander,
   ), 'λ/2、λ/4 波片 · 扩束 0.25–4');
 
-  add('alpha-module', 'α 平行移束模块（沿 X 移束）', '专利原理', train.alphaModule.A.clone().add(
+  add('alpha-module', 'α 平行移束模块（教学结构）', '教学等效', train.alphaModule.A.clone().add(
     new Vector3(-32, 42, 8),
-  ), '4 次反射 · 可动镜被首末两次击中');
+  ), '4 次反射 · 单镜 26 在此用分体镜面等效');
 
-  add('beta-module', 'β 平行移束模块（沿 Y 移束）', '专利原理', train.betaModule.A.clone().add(
+  add('beta-module', 'β 平行移束模块（教学结构）', '教学等效', train.betaModule.A.clone().add(
     new Vector3(-32, -50, 8),
-  ), '与 α 模块正交，位移方向合成二维');
+  ), '本模型选择正交排布 · 专利的位移方向可选正交');
 
   add('z-module', 'Z 动态调焦等效模块', '教学等效', new Vector3(
     BEAM_PATH.afterBeta.x - 46,
@@ -81,19 +81,19 @@ export function createLabels(train: OpticalTrain): { group: Group; items: LabelE
     AXIS.zGalvo,
   ), '改变物镜前光束会聚状态 → 移动焦点 Z');
 
-  add('galvo-y', 'Y 振镜', '公开确认', new Vector3(
+  add('galvo-y', 'Y 振镜（教学排布）', '教学等效', new Vector3(
     train.yGalvo.center.x - 2,
     train.yGalvo.center.y - 46,
     AXIS.galvoPlane + 4,
   ));
 
-  add('galvo-x', 'X 振镜（入瞳平面）', '公开确认', new Vector3(
+  add('galvo-x', 'X 振镜（等效入瞳参考）', '教学等效', new Vector3(
     train.xGalvo.center.x + 14,
     train.xGalvo.center.y + 48,
     AXIS.galvoPlane + 2,
   ));
 
-  add('monitor-splitter', '监测分光元件 + 光束位置测量单元', '公开确认', new Vector3(
+  add('monitor-splitter', '监测分光元件 + 光束位置测量单元', '教学等效', new Vector3(
     BEAM_PATH.afterBeta.x - 72,
     BEAM_PATH.afterBeta.y - 48,
     AXIS.monitoringSplitter - 6,
@@ -103,7 +103,7 @@ export function createLabels(train: OpticalTrain): { group: Group; items: LabelE
     40,
     -6,
     AXIS.objectiveLastLens + 44,
-  ), '工作距离 75 mm · 内部镜组未公开');
+  ), '焦距为公开值 · 内部镜组及后段距离为教学等效');
 
   add('protective-window', '快换保护玻璃抽屉', '公开确认', new Vector3(
     54,

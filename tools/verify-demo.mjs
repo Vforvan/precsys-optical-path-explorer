@@ -13,6 +13,16 @@ await mkdir('screenshots/revised', { recursive: true });
 const url = pathToFileURL(resolve('dist/index.html')).href;
 await page.goto(url);
 await page.waitForFunction(() => window.__PRECSYS__);
+await page.waitForFunction(() => document.querySelector('#geometry-card')?.textContent.includes('避让通过'));
+await page.locator('#geometry-card summary').click();
+await page.waitForTimeout(300);
+if (!await page.locator('#geometry-card details').evaluate(el => el.open)) throw Error('Geometry details closed during refresh');
+await page.evaluate(() => window.__PRECSYS__.state.setConditioning({ expanderMagnification: 40 }));
+await page.waitForFunction(() => document.querySelector('#geometry-card')?.textContent.includes('几何告警'));
+await page.screenshot({ path: 'screenshots/revised/geometry-warning.png' });
+await page.evaluate(() => window.__PRECSYS__.state.setConditioning({ expanderMagnification: 1 }));
+await page.waitForFunction(() => document.querySelector('#geometry-card')?.textContent.includes('避让通过'));
+await page.locator('#geometry-card summary').click();
 await page.screenshot({ path: 'screenshots/revised/overview.png' });
 const report = [];
 for (const id of ['percussion', 'trepann', 'spiral', 'precession-in', 'precession-out']) {
@@ -33,7 +43,7 @@ const motorCount = await page.evaluate(() => {
   window.__PRECSYS__.groups.optics.traverse(o => { if (o.userData.motorAxis) count++; });
   return count;
 });
-// 五轴各一台电机 + Z 随动折返镜一台 = 6
+// 保留五个执行轴外形及一个教学随动外形；后者不是实机第六轴。
 if (motorCount !== 6) throw Error(`Expected 6 motors, got ${motorCount}`);
 await page.getByRole('button', { name: '⏸ 暂停', exact: true }).click();
 const stopped = await page.evaluate(() => window.__PRECSYS__.state.theta);
@@ -71,7 +81,13 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: 'screenshots/revised/material-removal.png' });
-await page.locator('summary').click();
+const beforeSection = await page.evaluate(() => window.__PRECSYS__.workpiece.material.stats());
+await page.getByRole('button', { name: '剖切观察', exact: true }).click();
+await page.waitForTimeout(300);
+const afterSection = await page.evaluate(() => window.__PRECSYS__.workpiece.material.stats());
+if (beforeSection.removedVoxels !== afterSection.removedVoxels || beforeSection.resets !== afterSection.resets) throw Error('Section view reset stock');
+await page.screenshot({ path: 'screenshots/revised/material-section.png' });
+await page.locator('#controlbar summary').click();
 await page.getByText('爆炸视图', { exact: true }).click();
 await page.waitForTimeout(400);
 const aligned = await page.evaluate(() => {

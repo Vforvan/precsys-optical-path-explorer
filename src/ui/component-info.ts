@@ -84,8 +84,8 @@ const STATIC_PARTS: Record<string, Omit<PartInfo, 'id'>> = {
     input: '入瞳处的近似平行光束（可偏心、可倾斜）。',
     output: '把光束聚焦到工件上；入射偏心 → 入射角 α/β，入射坡度 → 焦点 X/Y。',
     coords: '入瞳偏心 h 与坡度 u 共同决定 X/Y/Z 与 α/β。',
-    trust: '公开确认',
-    note: `焦距 75 mm、有效焦距 25 mm、工作距离 75 mm、典型全会聚角 0.08 rad 均为公开值。${EDUCATIONAL_NOTES.objective}`,
+    trust: '教学等效',
+    note: EDUCATIONAL_NOTES.objective,
   },
   'protective-window': {
     name: '快换保护玻璃抽屉',
@@ -130,7 +130,7 @@ const STATIC_PARTS: Record<string, Omit<PartInfo, 'id'>> = {
     output: '被去除材料形成孔或轮廓。',
     coords: '工件表面定义为 z = 0，焦点坐标即相对它的位置。',
     trust: '教学等效',
-    note: '本页不做材料去除、热效应或孔形预测；孔型演示均为定性说明。',
+    note: '采用累计体素几何去除，仅切换加工策略清空。光斑与去除速率为教学参数，未标定脉冲能量、材料阈值与热效应，不能预测实机孔形或孔深。',
   },
   housing: {
     name: '主体外壳（教学示意包络）',
@@ -237,9 +237,8 @@ export function partInfo(id: string, train: OpticalTrain): PartInfo | null {
       input: '沿 -Z 传播的平行光束。',
       output: `沿 ${key === 'alpha' ? 'X' : 'Y'} 方向平行移束，输出方向与输入严格平行。`,
       coords: key === 'alpha' ? 'α 通道。' : 'β 通道。',
-      trust: '专利原理',
-      note:
-        '专利 EP3932609B1：三面平面镜（一面可转、两面固定），光束反射四次，第 1 次与第 4 次都落在可转镜上。可动镜的具体形式专利未描述，本模型用同一支架上的两块平行镜面实现（教学等效）。',
+      trust: '教学等效',
+      note: EDUCATIONAL_NOTES.shiftModuleInner,
       patentRef: 'EP3932609B1 Claim 1/4/5、[0015][0030][0032]',
     };
   }
@@ -298,7 +297,7 @@ export function renderPartCard(
     ? `<h3>当前光线的实际角度</h3>
        <dl class="kv">
          <dt>入射角（光线与镜面法线夹角）</dt><dd>${((hit.incidenceRad * 180) / Math.PI).toFixed(2)} °</dd>
-         <dt>反射后方向变化</dt><dd>${((hit.incidenceRad * 2 * 180) / Math.PI).toFixed(2)} °</dd>
+         <dt>入射到出射的方向转角</dt><dd>${(180 - (hit.incidenceRad * 2 * 180) / Math.PI).toFixed(2)} °</dd>
        </dl>
        <p class="dim">画面上的青色短线就是该点的镜面法线，白色横线是镜面方向；
        两条光线关于法线对称 —— 这就是模型的反射计算依据（d′ = d − 2(d·n)n）。</p>`
@@ -333,6 +332,10 @@ export function renderSources(container: HTMLElement, sources = SOURCES): void {
     .join('');
   container.innerHTML = `
     <h2>资料来源与优先级</h2>
+    <h3>专利原理 ≠ 实机装配图</h3>
+    <p>${EDUCATIONAL_NOTES.shiftModuleInner}</p>
+    <p>${EDUCATIONAL_NOTES.zModule}</p>
+    <p>${EDUCATIONAL_NOTES.objective}</p>
     <p class="dim">资料冲突时采用：当前型号正式技术文件 &gt; 当前官方产品手册 &gt; SCANLAB 专利的功能结构 &gt; 历史应用文章 &gt; 教学近似模型。</p>
     <ul class="source-list">${items}</ul>
   `;

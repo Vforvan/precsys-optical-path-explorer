@@ -2,7 +2,7 @@
  * α / β 平行移束模块（parallel shifting unit）—— 教学等效模型。
  *
  * 与专利 EP3932609B1 的对应（权利要求 1/3/4/5，说明书 [0015][0030][0032]）：
- *   三面平面镜；一面可转（26，振镜驱动）、两面固定（28、30）；三镜法向共面；
+ *   至少三镜；一镜可转（26，振镜驱动）、两镜固定（28、30）；可选法向共面；
  *   光束反射四次；第 1 次（入）与第 4 次（出）都落在可转镜 26 上。
  *
  * 模型内部结构（局部坐标，输出点即第 4 次命中点 B）：
@@ -23,25 +23,24 @@
  *
  * 三条可验证的结论（tests/parallel-shift.test.ts 逐条断言）：
  *   1. 两固定镜法向相同，两次反射对方向的作用互相抵消。这与专利的关系式
- *      φ_out = φ_in + 2(θ28 − θ30) 等价：可转镜角 θ26 被完全消掉。
+ *      定性描述相符。本模型由反射定律推导 φ_out = φ_in + 2(θ28 − θ30)，不是专利公式。
  *   2. 所以输出方向与输入方向严格平行、与可动镜转角无关；
  *      转角只改变横向位移量（量级 2Δ mm/rad，Δ = c1 − c2），
  *      即专利所说的"相对光轴 oA 的平行偏移"。
- *   3. 第 4 次反射的入射点位于 A→B 连线内部（可证明），因此光束一定会穿过
- *      A、B 之间的镜面区域，且第 4 次是从镜面另一侧入射 —— 单块单面镜无法
- *      同时完成这两次反射。模型据此把可动镜做成"同一振镜支架上的两块平行镜面
- *      + 一个法向小台阶"，两次反射都落在镜面正面。专利未描述可动镜的具体形式，
- *      此为教学等效处理，页面会明确标注。
+ *   3. 本模型 F1→F2 段会经过两可动镜面所在的平面；须校验有限光束包络避让。
+ *      专利未规定可动镜的背面、开孔或让位结构，本模型选取同一支架上的
+ *      两块平行镜面及法向台阶。四个独立反射面只能演示功能，不能宣称
+ *      已复原专利的单镜 26，更不能据此证明实机必须分体或背面入射。
  */
 
 import { Vector3 } from 'three';
-import { DEG, clamp, intersectPlane, makeRay, reflect, type Ray } from './ray';
-import { intersectMirror, mirrorCenter, mirrorNormal, type MirrorSpec } from './mirror';
+import { DEG, clamp, intersectPlane, makeRay, propagate, reflect, type Ray, type BeamEnvelope } from './ray';
+import { intersectMirror, mirrorAxes, mirrorCenter, mirrorNormal, type MirrorSpec } from './mirror';
 import { SHIFT_INPUT_OFFSET_MM, SHIFT_MODULE } from '../config/layout';
 
 export type ShiftAxis = 'alpha' | 'beta';
 
-/** δ = 0 时两固定镜平面间距（决定位移灵敏度量级）。 */
+/** 两固定镜平面方程常数差；实际法向间距为 STATIC_DELTA/√2。 */
 export const STATIC_DELTA = SHIFT_MODULE.delta;
 
 /** 模块所需入光横向偏移（含台阶造成的附加偏移）。 */
@@ -84,6 +83,10 @@ export interface ShiftCrossing {
   insideAperture: boolean;
   /** 穿越点距该镜片中心的距离 mm。 */
   distanceFromCenterMm: number;
+  beamRadiusMm: number;
+  /** 镜面内的保守分离距离，已扣除斜入射足迹、板厚投影与安全余量。 */
+  clearanceMm: number;
+  envelopeClear: boolean;
 }
 
 export interface ShiftTraceResult {
@@ -102,6 +105,8 @@ export interface ShiftTraceResult {
   hitDistanceFromAMm: number;
   /** 穿越点沿镜面距 A 的距离 mm。 */
   crossingDistancesFromAMm: number[];
+  /** 两镜片沿共同 u 轴的边缘间距；不是法向台阶 stepMm。 */
+  gapWidthMm: number;
 }
 
 const Z_AXIS = new Vector3(0, 0, 1);
@@ -120,6 +125,7 @@ export function createShiftModule(
   const sAxis = axis === 'alpha' ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
   const zAxis = Z_AXIS.clone();
   const n0 = sAxis.clone().add(zAxis).normalize();
+  // 专利未规定，本模型选取垂直于单元光路平面的转轴。
   const rotAxis = zAxis.clone().cross(sAxis).normalize();
   const e1 = sAxis.clone().sub(zAxis).normalize();
   const e2 = rotAxis.clone();
@@ -158,7 +164,7 @@ export function createShiftModule(
     rotationAxis: rotAxis.clone(),
     rotationPivot: A.clone(),
     angleRad: 0,
-    trust: '专利原理',
+    trust: '教学等效',
     note:
       '可动镜组的第 1 块镜面，承受第 1 次反射。它与第 2 块镜面装在同一振镜支架上、法向相同、沿法向错开一个很小的台阶（教学等效处理）。',
     interactive: true,
@@ -176,7 +182,7 @@ export function createShiftModule(
     rotationAxis: rotAxis.clone(),
     rotationPivot: A.clone(),
     angleRad: 0,
-    trust: '专利原理',
+    trust: '教学等效',
     note:
       '可动镜组的第 2 块镜面，承受第 4 次反射，也就是模块的出光反射点。转角改变它上面落点的位置，从而改变输出光束的横向位移。',
     interactive: true,
@@ -192,7 +198,7 @@ export function createShiftModule(
     v: e2.clone(),
     size: fixedSize,
     trust: '专利原理',
-    note: '固定平行镜对的第一块（专利 28），把光束折向第二块固定镜。',
+    note: '固定镜功能对应专利 28，把光束折向固定镜 30；本页的尺寸、法向和位置为教学几何。',
     interactive: true,
   };
 
@@ -236,18 +242,31 @@ function specAt(spec: MirrorSpec, angleRad: number): MirrorSpec {
 }
 
 /** 判断点是否在某镜片有效口径内。 */
-function insideAperture(spec: MirrorSpec, point: Vector3): ShiftCrossing {
+function crossingClearance(spec: MirrorSpec, point: Vector3, direction: Vector3,
+  beamRadiusMm: number, safetyMm: number): ShiftCrossing {
   const center = mirrorCenter(spec);
-  const e1 = spec.u.clone();
-  const e2 = spec.v.clone();
+  const { u: e1, v: e2 } = mirrorAxes(spec);
   const offset = point.clone().sub(center);
   const alongU = Math.abs(offset.dot(e1));
   const alongV = Math.abs(offset.dot(e2));
+  const dn = Math.abs(direction.dot(mirrorNormal(spec)));
+  // 圆截面斜穿镜面变成椭圆；按两个局部轴的包围区间做保守分离判定。
+  // 板厚用两侧最坏投影，不依赖显示层的法向翻转。
+  const margin = (axis: Vector3, distance: number, halfSize: number) => {
+    const slope = Math.abs(direction.dot(axis)) / Math.max(dn, 1e-12);
+    return distance - halfSize - beamRadiusMm * Math.hypot(1, slope)
+      - SHIFT_MODULE.plateThickness * slope - safetyMm;
+  };
+  const clearanceMm = Math.max(margin(e1, alongU, spec.size.u / 2),
+    margin(e2, alongV, spec.size.v / 2));
   return {
     tile: spec.id.endsWith('in') ? 'in' : 'out',
     point: point.clone(),
     insideAperture: alongU <= spec.size.u / 2 && alongV <= spec.size.v / 2,
     distanceFromCenterMm: offset.length(),
+    beamRadiusMm,
+    clearanceMm,
+    envelopeClear: clearanceMm >= 0,
   };
 }
 
@@ -256,6 +275,8 @@ export function traceShiftModule(
   geom: ShiftModuleGeometry,
   input: Ray,
   deltaRad: number,
+  inputEnvelope: BeamEnvelope = { radius: 1, vergence: 0 },
+  safetyMm = 0.25,
 ): ShiftTraceResult | null {
   const inSpec = specAt(geom.movableIn, deltaRad);
   const outSpec = specAt(geom.movableOut, deltaRad);
@@ -279,11 +300,18 @@ export function traceShiftModule(
 
   // 诊断：F1→F2 段是否穿过任一可动镜片
   const crossings: ShiftCrossing[] = [];
+  const toF1 = input.origin.distanceTo(hitA.point) + hitA.point.distanceTo(hitF1.point);
+  const segmentLength = hitF1.point.distanceTo(hitF2.point);
+  // 对整段取最大半径，保守覆盖板厚内的包络变化；同时记录交点处实际半径。
+  const maxRadius = Math.max(propagate(inputEnvelope, toF1).radius,
+    propagate(inputEnvelope, toF1 + segmentLength).radius);
   for (const spec of [inSpec, outSpec]) {
     const t = intersectPlane(ray2, mirrorCenter(spec), mirrorNormal(spec));
-    if (t !== null && t > 0) {
+    if (t !== null && t > 0 && t < segmentLength) {
       const p = ray2.origin.clone().addScaledVector(ray2.direction, t);
-      crossings.push(insideAperture(spec, p));
+      const crossing = crossingClearance(spec, p, ray2.direction, maxRadius, safetyMm);
+      crossing.beamRadiusMm = propagate(inputEnvelope, toF1 + t).radius;
+      crossings.push(crossing);
     }
   }
 
@@ -312,6 +340,8 @@ export function traceShiftModule(
     crossings,
     hitDistanceFromAMm: hitB.point.clone().sub(hitA.point).dot(geom.e1),
     crossingDistancesFromAMm: crossings.map((c) => c.point.clone().sub(geom.A).dot(geom.e1)),
+    gapWidthMm: Math.abs(mirrorCenter(outSpec).sub(mirrorCenter(inSpec)).dot(mirrorAxes(inSpec).u))
+      - (inSpec.size.u + outSpec.size.u) / 2,
   };
 }
 

@@ -101,7 +101,7 @@ describe('平行移束模块（四次反射 / 输出方向不变 / 位移随转�
     }
   });
 
-  it('光束不会穿过任何一块可动镜片（走两块镜面之间的空档）', () => {
+  it('中心光线不穿可动镜片（有限包络须另行校验）', () => {
     for (let deltaDeg = -3; deltaDeg <= 3.0001; deltaDeg += 0.5) {
       const t = traceAt(alpha, deltaDeg)!;
       expect(t).not.toBeNull();
@@ -109,6 +109,56 @@ describe('平行移束模块（四次反射 / 输出方向不变 / 位移随转�
         expect(crossing.insideAperture).toBe(false);
       }
     }
+  });
+
+  it('零位缝宽不是 11 mm 台阶，且大于斜入射光束直径与安全裕量', () => {
+    const t = traceAt(alpha, 0)!;
+    expect(t.gapWidthMm).toBeCloseTo(51 * Math.SQRT2 + 11 - 26, 9);
+    expect(t.gapWidthMm).toBeGreaterThan(2 * Math.SQRT2 + 2 * 0.25);
+    expect(t.crossings).toHaveLength(2);
+    const minimum = Math.min(...t.crossings.map(c => c.clearanceMm));
+    expect(minimum).toBeCloseTo(27.5 * Math.SQRT2 - 15 - Math.SQRT2 - 2.6 - 0.25, 8);
+    console.log('P2 零位 mm', { gap: t.gapWidthMm, radius: 1, clearance: minimum });
+  });
+
+  it('两模块全机械行程校验：典型光束通过，超宽光束如实报告', () => {
+    let worst = Infinity;
+    for (const module of [alpha, beta]) for (const radius of [1, 1.25, 3, 5]) {
+      let localWorst = { margin: Infinity, angle: 0 };
+      for (let i = 0; i <= 140; i++) {
+        const delta = (-3.5 + i * 0.05) * DEG;
+        const t = traceShiftModule(module, moduleInputRay(module), delta, { radius, vergence: 0 })!;
+        expect(t.crossings).toHaveLength(2);
+        for (const c of t.crossings) {
+          if (radius <= 1.25) expect(c.envelopeClear, `${module.axis}, r=${radius}, angle=${delta / DEG}`).toBe(true);
+          expect(c.envelopeClear).toBe(c.clearanceMm >= 0);
+          worst = Math.min(worst, c.clearanceMm);
+          if (c.clearanceMm < localWorst.margin) localWorst = { margin: c.clearanceMm, angle: delta / DEG };
+        }
+      }
+      console.log('P2 扫角', module.axis, radius, localWorst);
+    }
+    console.log('P2 扫角最小余量 mm', worst);
+  });
+
+  it('中心光线能过但宽光束不能过时，明确判为失败', () => {
+    const t = traceShiftModule(alpha, moduleInputRay(alpha), 0, { radius: 40, vergence: 0 })!;
+    expect(t.crossings.every(c => !c.insideAperture)).toBe(true);
+    expect(t.crossings.some(c => !c.envelopeClear && c.clearanceMm < 0)).toBe(true);
+  });
+
+  it('转动后使用旋转后的局部坐标，且入射会聚度参与半径计算', () => {
+    const ray = moduleInputRay(alpha);
+    const angle = 3.5 * DEG;
+    const t = traceShiftModule(alpha, ray, angle, { radius: 2, vergence: -0.001 })!;
+    const c = t.crossings[1];
+    const length = ray.origin.distanceTo(t.points[0]) + t.points[0].distanceTo(t.points[1])
+      + t.points[1].distanceTo(c.point);
+    expect(c.beamRadiusMm).toBeCloseTo(2 * (1 + 0.001 * length), 9);
+    const collimated = traceShiftModule(alpha, ray, angle, { radius: 2, vergence: 0 })!;
+    expect(c.clearanceMm).toBeLessThan(collimated.crossings[1].clearanceMm);
+    const expanded = traceShiftModule(alpha, ray, angle, { radius: 2, vergence: 0 }, 1.25)!;
+    expect(expanded.crossings[1].clearanceMm).toBeCloseTo(collimated.crossings[1].clearanceMm - 1, 9);
   });
 
   it('两块固定镜法向相同（平行镜对是"方向不变"的原因）', () => {

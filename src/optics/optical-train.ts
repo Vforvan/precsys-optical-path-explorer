@@ -122,7 +122,7 @@ export interface OpticalTrain {
   focusModule: FocusModuleGeometry;
   /** Y 振镜：位于 (-16,0,150)，把 -Z 折向 +X。 */
   yGalvo: MirrorSpec;
-  /** X 振镜：位于 (0,0,150)，镜面平面即物镜入瞳平面，把 +X 折回 -Z。 */
+  /** X 振镜：名义中心 (0,0,150)，命中点作等效入瞳参考，把 +X 折回 -Z。 */
   xGalvo: MirrorSpec;
   /** 监测分光元件（只画不挡主光路）。 */
   splitter: MirrorSpec;
@@ -163,15 +163,15 @@ export function createOpticalTrain(variant: OpticsVariant): OpticalTrain {
     size: { u: GALVO.mirrorSizeMm, v: GALVO.mirrorSizeMm },
     rotationAxis: new Vector3(1, 0, -1).normalize(),
     angleRad: 0,
-    trust: '公开确认',
+    trust: '教学等效',
     note:
-      '把 -Z 光束折向 +X。镜面内的转轴使偏转主要改变光束在 Y 方向的坡度（决定焦点 Y）。因为它不在入瞳平面上，扫描时会把一部分不需要的 Y 向偏心带进入瞳 —— 这正是需要联合补偿的耦合。',
+      '二维偏转功能见专利权利要求 2；此处位置、转轴与折向 +X 的排布是教学选取。扫描带出的 Y 向偏心由本模型联合补偿，不代表实机通道映射。',
     interactive: true,
   };
 
   const xGalvo: MirrorSpec = {
     id: 'galvo-x',
-    label: 'X 振镜（入瞳平面）',
+    label: 'X 振镜（等效入瞳参考）',
     kind: 'movable',
     center: new Vector3(BEAM_PATH.machineAxis.x, BEAM_PATH.machineAxis.y, AXIS.galvoPlane),
     normal: new Vector3(-1, 0, -1).normalize(),
@@ -180,9 +180,9 @@ export function createOpticalTrain(variant: OpticsVariant): OpticalTrain {
     size: { u: GALVO.mirrorSizeMm, v: GALVO.mirrorSizeMm },
     rotationAxis: new Vector3(0, 1, 0),
     angleRad: 0,
-    trust: '公开确认',
+    trust: '教学等效',
     note:
-      '把 +X 光束折回 -Z。它的镜面平面与物镜入瞳平面重合，转轴落在入瞳平面上：改变的是光束在入瞳处的坡度 u（决定焦点 X），基本不产生偏心。',
+      '教学折转：+X→-Z。本模型用此镜命中点作等效入瞳参考点；倾斜镜面不等于水平入瞳面。位置、转轴与通道映射并非厂商公开结构。',
     interactive: true,
   };
 
@@ -195,8 +195,8 @@ export function createOpticalTrain(variant: OpticsVariant): OpticalTrain {
     u: new Vector3(1, 0, -1).normalize(),
     v: new Vector3(0, 1, 0),
     size: { u: 18, v: 18 },
-    trust: '公开确认',
-    note: '分出一小部分光到光束位置测量单元，用于 Automatic Fine Adjustment（自动精调）。',
+    trust: '教学等效',
+    note: '分光监测功能有公开依据（专利权利要求 8/9、[0044]）；本页取样位置与传感器排布为教学选取。Automatic Fine Adjustment 的真实内部光路未据此复原。',
     interactive: true,
   };
 
@@ -300,7 +300,7 @@ export function traceTrain(
   ray = makeRay(condEnd, new Vector3(0, 0, -1));
 
   // 2) α 平行移束模块（沿 X 移束）
-  const alphaTrace = traceShiftModule(train.alphaModule, ray, actuators.alphaRad);
+  const alphaTrace = traceShiftModule(train.alphaModule, ray, actuators.alphaRad, builder.envelope);
   if (!alphaTrace) {
     return failedTrace(builder, 'α 平行移束模块求交失败（角度超限或几何异常）');
   }
@@ -311,7 +311,7 @@ export function traceTrain(
   ray = alphaTrace.output;
 
   // 3) β 平行移束模块（沿 Y 移束）
-  const betaTrace = traceShiftModule(train.betaModule, ray, actuators.betaRad);
+  const betaTrace = traceShiftModule(train.betaModule, ray, actuators.betaRad, builder.envelope);
   if (!betaTrace) {
     return failedTrace(builder, 'β 平行移束模块求交失败（角度超限或几何异常）');
   }
