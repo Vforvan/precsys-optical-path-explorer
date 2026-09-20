@@ -7,8 +7,11 @@
 
 | 交付物 | 入口 | 内容 |
 |---|---|---|
-| **教学型光路对照模型**（在线版） | <https://vforvan.github.io/precsys-optical-path-explorer/> | 两套五轴（X / Y / Z / α / β）扫描头的教学型三维光路，页面顶部可切换对照 |
-| **五轴工程结构候选 V2**（离线单文件） | `engineering-dist/index.html`（双击即开） | 四个独立旋转振镜轴 + 一个单片透镜直线调焦轴，含完整光路、独立镜座与承载平台 |
+| **教学型光路对照模型** | 🌐 在线 <https://vforvan.github.io/precsys-optical-path-explorer/> | 两套五轴（X / Y / Z / α / β）扫描头的教学型三维光路，页面顶部可切换对照 |
+| **五轴工程结构候选 V2** | 🌐 在线 <https://vforvan.github.io/precsys-optical-path-explorer/engineering/> <br>💾 离线 `engineering-dist/index.html`（双击即开） | 四个独立旋转振镜轴 + 一个单片透镜直线调焦轴，含完整光路、独立镜座与承载平台 |
+
+> 两个页面都是**自包含单文件**（JS/CSS 已内联，运行期不加载任何外部资源），
+> 在线打开与本地双击效果完全一致。工程候选页也不加载 `.glb`——那些模型是页面**导出**的。
 
 教学型光路模型支持的两条技术路线及各自的结构依据：
 
@@ -120,19 +123,31 @@ npm run verify:novanta # Novanta 模式浏览器验收（39 项：平板/折射/
 
 ### 在线版与发布方式
 
-本仓库用 **GitHub Pages** 发布在线版，发布源是 `main` 分支的 `/docs` 目录：
+本仓库用 **GitHub Pages** 发布在线版，发布源是 `main` 分支的 `/docs` 目录，**两个交付物都在线上**：
 
-- `docs/` 是**构建产物**，由 `npm run build` 自动从 `dist/` 同步而来，请勿手工编辑；
+| 线上地址 | 对应源码产物 |
+|---|---|
+| <https://vforvan.github.io/precsys-optical-path-explorer/> | `docs/index.html` ← `dist/index.html`（教学模型） |
+| <https://vforvan.github.io/precsys-optical-path-explorer/engineering/> | `docs/engineering/index.html` ← `engineering-dist/index.html`（工程候选 V2） |
+
+- `docs/` 是**构建产物**，由 `npm run build` 自动同步，请勿手工编辑；
 - 它随源码一起提交，因此线上页面和仓库内容永远对得上；
-- 改完代码后，`npm run build` → `git add` → `git commit` → `git push`，Pages 会自动重新发布。
+- 改完代码后 `npm run build` → `git add` → `git commit` → `git push`，Pages 会自动重新发布。
+
+> ⚠️ **`npm run build` 会先清空 `docs/` 再重建**，所以工程候选页也在同一步里被复制进去
+> （见 `tools/build-standalone.mjs` 的 `publish()`）。如果只改了工程候选，
+> 按顺序跑 `npm run build:engineering` → `npm run build`，否则线上工程页会被这一步清掉。
+> 若 `engineering-dist/index.html` 不存在，该步骤会打印警告并跳过，不会中断构建。
 
 > `dist/` 与 `docs/` 内容相同，区别是 `dist/` 不入库（见 `.gitignore`），`docs/` 入库。
-> 为什么不直接让 Pages 指向 `dist/`：Pages 只能发布仓库里**已提交**的目录。
+> 为什么不直接让 Pages 指向 `dist/`：Pages 只能发布仓库里**已提交**的目录，
+> 而且发布源被限定在一个分支目录内——不在 `docs/` 下的文件即使 push 了也没有在线地址。
 
 ### 怎么打开（重要）
 
 **双击 `dist/index.html` 即可**。构建脚本会把 JS 与 CSS 全部内联进这一个 HTML 文件，
 并打成经典脚本（IIFE），所以离线双击就能运行 —— 整个模型就是一个可以随便转发的 HTML 文件。
+工程候选同样是自包含单文件，双击 `engineering-dist/index.html` 即可（见第 10 节）。
 
 > 为什么必须内联：浏览器在 `file://` 下会以 CORS 拒绝**外链** module 脚本与带 `crossorigin`
 > 的样式表（origin 为 `null`），普通 Vite 产物双击打开时只有 HTML 骨架、三维部分根本不启动。
@@ -561,6 +576,8 @@ precsys-optical-path-explorer/
 ├─ .gitignore  .gitattributes  忽略构建中间产物 / 统一换行符
 ├─ LICENSE  NOTICE.md          MIT 正文 / 第三方组件与商标声明
 ├─ docs/                       教学模型的 GitHub Pages 发布目录（构建产物，勿手改）
+│  ├─ index.html               教学模型线上页 ← dist/index.html
+│  └─ engineering/index.html   工程候选线上页 ← engineering-dist/index.html
 ├─ engineering-dist/           工程候选 V2 的交付目录（**入库**，见 .gitignore 注释）
 │  ├─ index.html               自包含离线交互模型
 │  ├─ 结构说明.md              手写设计文档：结构选择 / 参数表 / 验证数据 / 待办
@@ -752,17 +769,24 @@ precsys-optical-path-explorer/
 
 ## 10. 五轴工程结构候选 V2（本仓库第二个交付物）
 
-`engineering-dist/index.html` 可双击离线打开，包含**四个独立旋转振镜轴 + 一个单片透镜直线调焦轴**、
-完整光路、独立镜座和承载平台。已实现 ±7° AOI 与恒定 7° 全方位进动；
+`engineering-dist/index.html` 可双击离线打开，也可以直接在线打开：
+**<https://vforvan.github.io/precsys-optical-path-explorer/engineering/>**
+
+包含**四个独立旋转振镜轴 + 一个单片透镜直线调焦轴**、完整光路、独立镜座和承载平台。
+已实现 ±7° AOI 与恒定 7° 全方位进动；
 **2,619 个联合目标**通过薄透镜模型下的逆解、采样通光和可控性检查。
 
 | 内容 | 位置 |
 |---|---|
 | 离线交互模型（自包含单文件） | `engineering-dist/index.html`（双击即开，无需服务器） |
+| 线上副本（GitHub Pages） | `docs/engineering/index.html` —— 由 `npm run build` 自动同步，**勿手改** |
 | 设计文档：结构选择、光路与驱动关系、参数表、验证数据、**尚需完成的工程工作** | [`engineering-dist/结构说明.md`](engineering-dist/结构说明.md) |
 | GLB 装配模型 ×3（含 V1 历史版本） | `engineering-dist/*.glb` |
 | 参数与验证报告 | `engineering-dist/*.json` |
 | 开发入口 / 构建 / 验收 | `engineering.html` / `npm run build:engineering` / `npm run verify:engineering` |
+
+> 线上只发布 `index.html`（580 KB）：页面不加载 `.glb`，模型是运行时**导出**的，
+> 因此那 4 MB 的 GLB/参数文件留在 `engineering-dist/` 供下载，不必让线上多背一份。
 
 **光路**：水平入光 → L1 → L2 → R1 → R2 → R3 → R4 → L3 → 工件。
 R1/R3 与 R2/R4 是前后分离的两组镜片，通过联合控制分别调节两个横向方向的位置与角度；

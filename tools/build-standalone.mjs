@@ -104,11 +104,18 @@ async function inline() {
  * 把 dist/ 的产物同步到 docs/ —— 后者是纳入版本管理的发布目录，
  * GitHub Pages 直接从 main 分支的 /docs 提供线上页面。
  *
- * 两个要点：
+ * 三个要点：
  *   1. 先清空再复制，避免删掉的文件残留在发布目录里；
+ *      **正因为清空**，工程候选页必须在这里一并复制（见下），
+ *      否则每次 npm run build 都会把它从 docs/ 里删掉，线上变 404；
  *   2. 写入 .nojekyll：GitHub Pages 默认用 Jekyll 处理，而 Jekyll 会忽略
- *      下划线开头的文件；放这个空文件等于告诉它"原样发布，别预处理"。
+ *      下划线开头的文件；放这个空文件等于告诉它"原样发布，别预处理"；
+ *   3. 工程候选页放在 docs/engineering/ —— Pages 的发布源是分支目录，
+ *      不在 docs/ 下的文件即使 push 了也没有在线地址。
  */
+const engineeringDir = join(root, 'engineering-dist');
+const engineeringPage = join(pagesDir, 'engineering', 'index.html');
+
 async function publish() {
   await rm(pagesDir, { recursive: true, force: true });
   await mkdir(pagesDir, { recursive: true });
@@ -117,6 +124,22 @@ async function publish() {
 
   const { size } = await stat(join(pagesDir, 'index.html'));
   console.log(`发布目录已同步：docs/index.html（${(size / 1024).toFixed(0)} KB）`);
+
+  // 工程候选页同样发布到线上。**只复制 index.html**：
+  // 它是自包含的单文件（JS/CSS 已内联，也不加载 .glb —— 模型是页面导出的），
+  // 所以网页演示不需要那 4 MB 的 GLB/参数文件，不必让线上多背一份。
+  try {
+    await mkdir(dirname(engineeringPage), { recursive: true });
+    await cp(join(engineeringDir, 'index.html'), engineeringPage);
+    const eng = await stat(engineeringPage);
+    console.log(`发布目录已同步：docs/engineering/index.html（${(eng.size / 1024).toFixed(0)} KB）`);
+  } catch {
+    // 工程候选还没构建过（engineering-dist/index.html 不存在）不是错误：
+    // 只跑 npm run build 时允许它缺席，线上保留上一次发布的版本。
+    console.warn('跳过工程候选页：engineering-dist/index.html 不存在，'
+      + '如需发布请先运行 npm run build:engineering');
+  }
+
   console.log('提交并推送 docs/ 后，GitHub Pages 会自动更新线上页面。');
 }
 
