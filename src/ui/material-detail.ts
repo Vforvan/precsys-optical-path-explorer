@@ -2,7 +2,7 @@ import { AmbientLight, Color, DirectionalLight, Mesh, MeshBasicMaterial, Perspec
   Scene, SphereGeometry, WebGLRenderer } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { WorkpieceView } from '../scene/cumulative-workpiece';
-import type { AppSnapshot } from '../app-state';
+import { commonTrace, type AppSnapshot } from '../app-state';
 
 export class MaterialDetail {
   private scene = new Scene();
@@ -58,7 +58,7 @@ export class MaterialDetail {
       this.stats.textContent = `已去除 ${stats.volumeMm3.toFixed(4)} mm³ · 最大深度 ${stats.maxDepthMm.toFixed(2)} mm`;
       this.elapsed = 0;
     }
-    this.dot.position.copy(snapshot.trace.focusPoint);
+    this.dot.position.copy(commonTrace(snapshot.trace).focusPoint);
     this.dot.visible = snapshot.mode === 'process' && snapshot.playing;
     this.controls.update();
     this.renderer.render(this.scene, this.camera);

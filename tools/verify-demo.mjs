@@ -31,8 +31,9 @@ for (const id of ['percussion', 'trepann', 'spiral', 'precession-in', 'precessio
   await page.waitForTimeout(750);
   const result = await page.evaluate(() => {
     const s = window.__PRECSYS__.state.snapshot();
-    return { mode: s.mode, playing: s.playing, theta: s.theta, ok: s.trace.ok,
-      residual: s.residual, focus: s.trace.focusPoint.toArray(), actuators: s.actuators };
+    // 快照里的 trace / actuators 现在按技术路线加了标签，故多一层 .trace / .actuators
+    return { mode: s.mode, playing: s.playing, theta: s.theta, ok: s.trace.trace.ok,
+      residual: s.residual, focus: s.trace.trace.focusPoint.toArray(), actuators: s.actuators.actuators };
   });
   if (result.mode !== 'process' || !result.playing || !result.ok || result.theta <= before) throw Error(`Preset failed: ${id}`);
   report.push({ id, ...result });
@@ -40,11 +41,12 @@ for (const id of ['percussion', 'trepann', 'spiral', 'precession-in', 'precessio
 await page.screenshot({ path: 'screenshots/revised/process.png' });
 const motorCount = await page.evaluate(() => {
   let count = 0;
-  window.__PRECSYS__.groups.optics.traverse(o => { if (o.userData.motorAxis) count++; });
+  window.__PRECSYS__.chain().group.traverse(o => { if (o.userData.motorAxis) count++; });
   return count;
 });
-// 保留五个执行轴外形及一个教学随动外形；后者不是实机第六轴。
-if (motorCount !== 6) throw Error(`Expected 6 motors, got ${motorCount}`);
+// 5 个驱动外形：4 台振镜电机（X/Y/α/β）+ 1 个 Z 三透镜直线调焦台（group.userData.motorAxis = 'Z'）。
+// 注意 z-linear-stage 是**直线驱动**，不是第六台振镜电机 —— README 里"5 个模型执行轴"的说法与此一致。
+if (motorCount !== 5) throw Error(`Expected 5 actuator motors, got ${motorCount}`);
 await page.getByRole('button', { name: '⏸ 暂停', exact: true }).click();
 const stopped = await page.evaluate(() => window.__PRECSYS__.state.theta);
 const retained = await page.evaluate(() => window.__PRECSYS__.workpiece.material.stats());

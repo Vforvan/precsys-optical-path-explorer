@@ -376,6 +376,23 @@ export class SceneView {
     this.controls.update();
   }
 
+  /**
+   * 沿机器光轴俯视（Top View）。
+   *
+   * 与 focusOn 的区别是**视线方向固定为 −Z**（不再用固定斜角）：
+   * Novanta 模式的 Dual-Plate Top View 要让人正对光束横截面看，
+   * 才能看清"两块板只做正交倾斜、但合成的位移向量在绕光轴旋转"。
+   *
+   * @param offset 相对正俯视的小偏移量（0 = 严格俯视）。
+   *        留一点偏移是为了不丢深度感，但保持接近正交投影的观感。
+   */
+  lookAlongOpticalAxis(target: Vector3, distance: number, offset = 0): void {
+    const dir = new Vector3(offset, -offset, 1).normalize();
+    this.camera.position.copy(target.clone().addScaledVector(dir, distance));
+    this.controls.target.copy(target);
+    this.controls.update();
+  }
+
   resetView(): void {
     // 距离 1150：整机（约 700 mm 高）能填满视口大部分，又不会切到上下两端
     this.focusOn(new Vector3(-8, -6, 300), 1150, 0.42);

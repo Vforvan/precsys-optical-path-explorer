@@ -74,8 +74,8 @@ export class ProcessPresets {
     this.status.textContent = s.mode === 'process'
       ? `${s.playing ? '● 演示中' : fraction >= 1 ? '✓ 已完成' : 'Ⅱ 已暂停'} · ${matches ? preset.name : '自定义加工'} · ${(fraction * 100).toFixed(0)}%`
       : '选择上方工艺，开始整机联动';
-    const values = [s.actuators.xRad * 180 / Math.PI, s.actuators.yRad * 180 / Math.PI,
-      s.actuators.zDeg, s.actuators.alphaRad * 180 / Math.PI, s.actuators.betaRad * 180 / Math.PI];
+    // 执行器读数用快照里的统一量纲视图（两条路线各自的字段名已在 app-state 里收口）
+    const values = s.actuatorReadout.values;
     Array.from(this.axes.children).forEach((node, i) => {
       node.querySelector('output')!.textContent = `${values[i].toFixed(2)}°`;
       const bar = node.querySelector('b') as HTMLElement;

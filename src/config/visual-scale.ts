@@ -22,6 +22,16 @@ export const VISUAL_GAIN = {
    * 但镜片位姿与光线方向仍按真实角度计算。
    */
   actuatorArrow: 2.2,
+  /**
+   * Novanta 望远镜镜组的**轴向行程绘制放大**。
+   *
+   * 真实行程只有 ±1.5 mm（对应焦点 Z ±0.27 mm），等比绘制在屏幕上不到 10 px，
+   * 读者会以为"Z 轴演示时镜片没动"。因此绘制时把相对零位的轴向位移放大这么多倍，
+   * 并在页面上标注为视觉放大。
+   * **只放大绘制位置**：透镜在光学模型里的位置仍由 telescopeLensesAt() 按真实行程给出，
+   * 因此光线、焦点 Z 与所有读数不受影响。
+   */
+  novantaLensTravel: 8,
   /** 焦点轨迹尾迹的线宽放大。 */
   traceWidth: 1,
 } as const;
@@ -31,6 +41,7 @@ export const VISUAL_GAIN_LABEL: Record<keyof typeof VISUAL_GAIN, string> = {
   zFocus: `焦点 Z 位移视觉放大 ×${VISUAL_GAIN.zFocus}（公开范围仅 ±1 mm）`,
   vergence: `光束会聚度视觉放大 ×${VISUAL_GAIN.vergence}`,
   actuatorArrow: `执行器转角箭头放大 ×${VISUAL_GAIN.actuatorArrow}（光线仍按真实角度计算）`,
+  novantaLensTravel: `望远镜镜组轴向行程绘制放大 ×${VISUAL_GAIN.novantaLensTravel}（真实 ±1.5 mm；光线与焦点仍按真实行程计算）`,
   traceWidth: '轨迹线宽为视觉表达',
 };
 

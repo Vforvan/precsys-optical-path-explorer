@@ -9,7 +9,6 @@
 
 import {
   Box3,
-  BufferAttribute,
   BoxGeometry,
   CylinderGeometry,
   EdgesGeometry,
@@ -21,7 +20,6 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   Object3D,
-  PlaneGeometry,
   Quaternion,
   RingGeometry,
   TorusGeometry,
@@ -38,6 +36,7 @@ import { OBJECTIVE, AXIS, BEAM_PATH, GALVO, SHIFT_MODULE } from '../config/layou
 import { beamAlignedCylinder } from './geometry-helpers';
 import type { SceneMaterials } from './create-scene';
 import { createGalvoMotor } from './galvo-motor';
+import { createFocusStage } from './create-focus-stage';
 
 export interface PartEntry {
   id: string;
@@ -51,8 +50,6 @@ export interface OpticsView {
   parts: PartEntry[];
   /** 每帧更新可动件位姿。 */
   update(actuators: ActuatorState, trace: TrainTrace): void;
-  /** 变焦反射镜曲率动画（教学等效，视觉放大）。 */
-  setCurvedMirrorRadius(radiusMm: number): void;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -144,36 +141,6 @@ function createMovableMount(
     g.add(bridge);
   }
   return g;
-}
-
-/** 变焦反射镜：平面网格 + 矢高（凸/平/凹）。 */
-function createCurvedMirrorMesh(size: number, materials: SceneMaterials): Mesh {
-  const geo = new PlaneGeometry(size, size, 30, 30);
-  const mesh = new Mesh(geo, materials.mirrorMovable);
-  mesh.castShadow = true;
-  mesh.userData.partId = 'z-curved';
-  mesh.userData.baseSize = size;
-  return mesh;
-}
-
-/** 按曲率半径更新变焦镜矢高（视觉放大绘制，页面会标注）。 */
-export function applyCurvature(mesh: Mesh, radiusMm: number, visualGain = 22): void {
-  const geo = mesh.geometry as PlaneGeometry;
-  const pos = geo.getAttribute('position') as BufferAttribute;
-  if (!geo.userData.flat) {
-    geo.userData.flat = Float32Array.from(pos.array as Float32Array);
-  }
-  const flat = geo.userData.flat as Float32Array;
-  const finite = Number.isFinite(radiusMm) && Math.abs(radiusMm) > 1e-6;
-  for (let i = 0; i < pos.count; i += 1) {
-    const x = flat[i * 3];
-    const y = flat[i * 3 + 1];
-    const r2 = x * x + y * y;
-    const sag = finite ? ((r2 / (2 * radiusMm)) * visualGain) : 0;
-    pos.setZ(i, Math.max(-8, Math.min(8, sag)));
-  }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
 }
 
 /**
@@ -455,27 +422,10 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
   }
 
   // Z 动态调焦等效模块
-  const zGalvo = createGalvo(train.focusModule.galvo, materials);
-  group.add(zGalvo);
-  galvos.push({ group: zGalvo, spec: train.focusModule.galvo });
-  register('z-galvo', 'Z 可动折转镜', zGalvo.children[0], train.focusModule.galvo);
-
-  const curved = createCurvedMirrorMesh(train.focusModule.curved.size.u, materials);
-  curved.position.copy(mirrorCenter(train.focusModule.curved));
-  curved.quaternion.copy(
-    orientationOf(
-      mirrorNormal(train.focusModule.curved),
-      train.focusModule.curved.u,
-      train.focusModule.curved.v,
-    ),
-  );
-  group.add(curved);
-  register('z-curved', '变焦反射镜', curved, train.focusModule.curved);
-
-  const fold = createGalvo(train.focusModule.fold, materials);
-  group.add(fold);
-  galvos.push({ group: fold, spec: train.focusModule.fold });
-  register('z-fold', 'Z 折返镜', fold.children[0], train.focusModule.fold);
+  const zStage = createFocusStage(train.focusModule);
+  group.add(zStage.group);
+  register('z-module', 'Z 三透镜联动调焦', zStage.group);
+  for (const item of zStage.lensGroups) register(item.lens.id, item.lens.label, item.mesh, item.lens);
 
   // 两片振镜
   const yGalvoGroup = createGalvo(train.yGalvo, materials);
@@ -518,19 +468,11 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
   const motors = [
     { view: createGalvoMotor(train.xGalvo, 'X'), angle: (a: ActuatorState) => a.xRad },
     { view: createGalvoMotor(train.yGalvo, 'Y'), angle: (a: ActuatorState) => a.yRad },
-    { view: createGalvoMotor(train.focusModule.galvo, 'Z'), angle: (a: ActuatorState) => a.zDeg * Math.PI / 180 },
     { view: createGalvoMotor(train.alphaModule.movableIn, 'α'), angle: (a: ActuatorState) => a.alphaRad },
     { view: createGalvoMotor(train.betaModule.movableIn, 'β'), angle: (a: ActuatorState) => a.betaRad },
   ];
   for (const motor of motors) group.add(motor.view.group);
 
-  /**
-   * 教学 Z 折返镜保留随动驱动外形：它不是固定镜，而是每帧按"出射必须沿 −Z"解算法向的
-   * 随动镜，角度与执行器不同（因此不能用执行器角驱动，必须用本帧解出的姿态）。
-   * 专利未规定此结构；不能把这个示意驱动当作 precSYS 的第六轴。
-   */
-  const foldMotor = createGalvoMotor(train.focusModule.fold, 'Z 随动示意');
-  group.add(foldMotor.group);
   // 高亮只影响当前部件，避免与外壳、光束共用材质时互相覆盖透明度。
   group.traverse((object) => {
     if (object instanceof Mesh && !object.parent?.parent?.userData.motorAxis && !object.parent?.userData.motorAxis) {
@@ -557,20 +499,10 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
   const update = (actuators: ActuatorState, trace: TrainTrace) => {
     for (const motor of motors) motor.view.update(motor.angle(actuators));
 
-    // 随动折返镜的机械角：由本帧解出的法向相对名义法向求出（带符号，绕自身转轴）
-    {
-      const spec = train.focusModule.fold;
-      const axis = (spec.rotationAxis ?? spec.v).clone().normalize();
-      const n0 = spec.normal.clone().normalize();
-      const hit = trace.hits.find((h) => h.mirrorId === spec.id);
-      const n1 = hit ? hit.normal.clone().normalize() : n0;
-      const sin = n1.clone().crossVectors(n0, n1).dot(axis);
-      foldMotor.update(Math.atan2(sin, n0.dot(n1)));
-    }
+    zStage.update(actuators.zTravelMm, trace.zTrace);
     // 可动镜面：位置与朝向按刚体转动更新
     for (const part of movableParts) {
       const spec = part.spec;
-      if (spec.id === 'z-curved') continue; // 变焦镜只改曲率，姿态固定
       const rotated: MirrorSpec = { ...spec, angleRad: angleFor(spec, actuators) };
       part.object.position.copy(mirrorCenter(rotated));
       const axes = mirrorAxes(rotated);
@@ -608,8 +540,6 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
       let angle = spec.angleRad ?? 0;
       if (idTail === 'galvo-x') angle = actuators.xRad;
       else if (idTail === 'galvo-y') angle = actuators.yRad;
-      else if (spec.id === 'z-galvo') angle = (actuators.zDeg * Math.PI) / 180;
-      else if (spec.id === 'z-fold') angle = (actuators.zDeg * Math.PI) / 180 / 2;
       const rotated: MirrorSpec = { ...spec, angleRad: angle };
       const normal = mirrorNormal(rotated);
       const center = mirrorCenter(rotated);
@@ -650,6 +580,5 @@ export function buildOpticsView(train: OpticalTrain, materials: SceneMaterials):
     group,
     parts,
     update,
-    setCurvedMirrorRadius: (_radiusMm: number) => applyCurvature(curved, Infinity),
   };
 }

@@ -39,7 +39,7 @@ import {
   type FocusTraceResult,
 } from './focus-module';
 import { evaluateObjective, type FocusState, type PupilState } from './objective-model';
-import { AXIS, BEAM_PATH, GALVO, OBJECTIVE, SHIFT_MODULE } from '../config/layout';
+import { AXIS, BEAM_PATH, GALVO, OBJECTIVE, SHIFT_MODULE, FOCUS_MODULE } from '../config/layout';
 import type { OpticsVariant } from '../config/public-specs';
 
 /** 五个执行轴的状态：三个机械角 + 两个振镜角。 */
@@ -48,8 +48,8 @@ export interface ActuatorState {
   alphaRad: number;
   /** β 可动镜机械角（rad）。 */
   betaRad: number;
-  /** Z 执行器机械角（度）。 */
-  zDeg: number;
+  /** Z 执行器行程（mm），正值使 L3 沿传播方向移动。 */
+  zTravelMm: number;
   /** X 振镜机械角（rad）。 */
   xRad: number;
   /** Y 振镜机械角（rad）。 */
@@ -59,7 +59,7 @@ export interface ActuatorState {
 export const ZERO_ACTUATORS: ActuatorState = {
   alphaRad: 0,
   betaRad: 0,
-  zDeg: 0,
+  zTravelMm: 0,
   xRad: 0,
   yRad: 0,
 };
@@ -148,8 +148,8 @@ export function createOpticalTrain(variant: OpticsVariant): OpticalTrain {
   );
 
   const focusModule = createFocusModule(
-    new Vector3(BEAM_PATH.afterBeta.x, BEAM_PATH.afterBeta.y, AXIS.zGalvo),
-    AXIS.zFoldMirror - AXIS.entrancePupil,
+    new Vector3(BEAM_PATH.afterBeta.x, BEAM_PATH.afterBeta.y, AXIS.zLens2),
+    AXIS.zLens3 - AXIS.entrancePupil + GALVO.separationMm,
   );
 
   const yGalvo: MirrorSpec = {
@@ -227,9 +227,7 @@ export function createOpticalTrain(variant: OpticsVariant): OpticalTrain {
       betaModule.movableOut,
       betaModule.fixed1,
       betaModule.fixed2,
-      focusModule.galvo,
-      focusModule.curved,
-      focusModule.fold,
+      ...focusModule.lenses,
       yGalvo,
       xGalvo,
       splitter,
@@ -322,14 +320,18 @@ export function traceTrain(
   ray = betaTrace.output;
 
   // 4) Z 动态调焦等效模块
-  const zTrace = traceFocusModule(train.focusModule, ray, actuators.zDeg);
+  const zTrace = traceFocusModule(train.focusModule, ray, actuators.zTravelMm, builder.envelope);
   if (!zTrace) {
-    return failedTrace(builder, 'Z 动态调焦模块求交失败（执行器角度超限）');
+    return failedTrace(builder, 'Z 移动透镜求交失败（行程或近轴传播无效）');
   }
-  builder.travel(ray.origin, zTrace.points[0]);
-  builder.travel(zTrace.points[0], zTrace.points[1]);
-  builder.kick(zTrace.vergence);
-  builder.travel(zTrace.points[1], zTrace.points[2]);
+  for (let i = 0; i < 3; i++) {
+    const from = i === 0 ? ray.origin : zTrace.points[i - 1];
+    const radiusFrom = i === 0 ? builder.envelope.radius : zTrace.envelopesAfter[i - 1].radius;
+    builder.segments.push({ from: from.clone(), to: zTrace.points[i].clone(),
+      radiusFrom, radiusTo: zTrace.envelopesBefore[i].radius });
+    builder.points.push(zTrace.points[i].clone());
+  }
+  builder.envelope = zTrace.envelope;
   ray = zTrace.output;
 
   // 5) 监测分光元件（透射主光束）
@@ -367,7 +369,6 @@ export function traceTrain(
   };
   const focus = evaluateObjective(pupil);
   const focusPoint = new Vector3(focus.xMm, focus.yMm, focus.zMm);
-  const foldDirection = zTrace.points[2].clone().sub(zTrace.points[1]).normalize();
   const currentMirrors: MirrorSpec[] = [
     { ...train.alphaModule.movableIn, angleRad: actuators.alphaRad },
     train.alphaModule.fixed1, train.alphaModule.fixed2,
@@ -375,10 +376,6 @@ export function traceTrain(
     { ...train.betaModule.movableIn, angleRad: actuators.betaRad },
     train.betaModule.fixed1, train.betaModule.fixed2,
     { ...train.betaModule.movableOut, angleRad: actuators.betaRad },
-    { ...train.focusModule.galvo, angleRad: actuators.zDeg * DEG },
-    train.focusModule.curved,
-    { ...train.focusModule.fold, angleRad: 0,
-      normal: foldDirection.sub(new Vector3(0, 0, -1)).normalize() },
     ySpec, xSpec,
   ];
   const hits = collectHits(currentMirrors, builder.points);
@@ -489,14 +486,14 @@ export function outcomeArray(trace: TrainTrace): number[] {
 
 /** 执行器统一量纲（角度用度），便于求耦合矩阵。 */
 export function actuatorArray(a: ActuatorState): number[] {
-  return [a.xRad / DEG, a.yRad / DEG, a.zDeg, a.alphaRad / DEG, a.betaRad / DEG];
+  return [a.xRad / DEG, a.yRad / DEG, a.zTravelMm, a.alphaRad / DEG, a.betaRad / DEG];
 }
 
 export function actuatorFromArray(values: number[]): ActuatorState {
   return {
     xRad: values[0] * DEG,
     yRad: values[1] * DEG,
-    zDeg: values[2],
+    zTravelMm: values[2],
     alphaRad: values[3] * DEG,
     betaRad: values[4] * DEG,
   };
@@ -507,8 +504,8 @@ export const ACTUATOR_LIMITS = {
   /** X 振镜 ±6.9°。 */
   xRad: 0.12,
   yRad: 0.12,
-  /** Z 执行器 ±1.4°（对应公开的焦点 Z 范围 ±1 mm）。 */
-  zDeg: 1.4,
+  /** 教学直线行程；不是厂商机械轴参数。 */
+  zTravelMm: FOCUS_MODULE.maxTravelMm,
   /** α/β 可动镜：与模块机械行程一致。 */
   alphaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG,
   betaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG,
@@ -518,7 +515,7 @@ export function clampActuators(a: ActuatorState): ActuatorState {
   return {
     xRad: clamp(a.xRad, -ACTUATOR_LIMITS.xRad, ACTUATOR_LIMITS.xRad),
     yRad: clamp(a.yRad, -ACTUATOR_LIMITS.yRad, ACTUATOR_LIMITS.yRad),
-    zDeg: clamp(a.zDeg, -ACTUATOR_LIMITS.zDeg, ACTUATOR_LIMITS.zDeg),
+    zTravelMm: clamp(a.zTravelMm, -ACTUATOR_LIMITS.zTravelMm, ACTUATOR_LIMITS.zTravelMm),
     alphaRad: clamp(a.alphaRad, -ACTUATOR_LIMITS.alphaRad, ACTUATOR_LIMITS.alphaRad),
     betaRad: clamp(a.betaRad, -ACTUATOR_LIMITS.betaRad, ACTUATOR_LIMITS.betaRad),
   };

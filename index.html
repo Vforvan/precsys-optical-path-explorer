@@ -42,8 +42,8 @@
     <div id="app">
       <header id="topbar">
         <div class="brand">
-          <h1>precSYS 五轴硬件光路</h1>
-          <p class="subtitle">
+          <h1 id="brand-title">precSYS 五轴硬件光路</h1>
+          <p class="subtitle" id="brand-subtitle">
             教学型三维交互模型 · X / Y / Z / α / β 五轴激光扫描子系统
           </p>
         </div>
@@ -56,6 +56,9 @@
           <span class="badge badge-edu">教学等效</span>
         </div>
       </header>
+
+      <!-- 技术路线切换：放在整页最上方，读者一进来就该看到有两条路线可比较 -->
+      <section id="vendor-switch" aria-label="技术路线切换"></section>
 
       <section id="disclaimer" class="disclaimer" role="note">
         内部光路采用公开专利和官方资料建立的教学型等效模型。模块功能和光学关系可信，具体封装、尺寸及部分
@@ -76,6 +79,8 @@
 
         <aside id="side-panel" aria-label="说明与读数">
           <section class="panel-card" id="process-presets"></section>
+          <section class="panel-card" id="offset-card" hidden aria-label="位移轨迹俯视图"></section>
+          <section class="panel-card" id="precession-card" hidden aria-label="进动驱动策略"></section>
           <section class="panel-card" id="geometry-card" aria-label="事实边界与几何校验"></section>
           <section class="panel-card" id="module-card"></section>
           <section class="panel-card" id="readout-card"></section>

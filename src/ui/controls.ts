@@ -5,11 +5,23 @@
  * 控件只负责把用户输入写回状态，不在 UI 里做任何光学计算。
  */
 
-import type { AppMode, AppSnapshot, AppState, AppToggles } from '../app-state';
+import type { AppMode, AppSnapshot, AppState, AppToggles, Vendor } from '../app-state';
+import { VENDORS } from '../app-state';
 import type { EngineeringCommand } from '../optics/educational-inverse-model';
 import { PROCESS_MODES, TAPER_PRESETS, type ProcessParams } from '../animation/process-modes';
 import { OPTICS_VARIANTS, PUBLIC_SPECS_UI } from '../config/ui-text';
 import { geometryStatus } from './geometry-status';
+import { commonTrace } from '../app-state';
+import { NOVANTA_TITLE } from '../config/novanta-layout';
+
+/**
+ * Novanta 模式的页面固定说明。
+ * 与 SCANLAB 模式的那句并列，分别说明"这条路线为什么是教学重建"。
+ */
+const NOVANTA_DISCLAIMER =
+  '本模式是依据公开 ARGES 专利原理（DE102004053298B4）建立的教学重建，不是 PE III 实机内部结构的 CAD 复刻。' +
+  '两块平行平板的尺寸、厚度、玻璃折射率与间距，Galilei 望远镜的焦距与放大倍率，物镜内部结构与有效焦距，' +
+  '以及当前 PE III 的真实机械布局，均未公开，本页相关数值一律标记为"教学等效"。';
 
 export interface ControlsHandlers {
   onPlayToggle(): void;
@@ -25,9 +37,46 @@ export interface ControlsHandlers {
   onCompensationToggle(on: boolean): void;
   /** 引导流程：跳到第 index 步（null = 退出）。 */
   onTourStep(index: number | null): void;
+  /** 切换技术路线（SCANLAB precSYS / Novanta ARGES）。 */
+  onVendorChange(vendor: Vendor): void;
 }
 
-export type CameraPreset = 'overview' | 'alpha' | 'z' | 'objective' | 'workpiece';
+/**
+ * 快捷视角。两条路线各有自己的看重点：
+ *   SCANLAB：α/β 反射移束模块、Z 等效模块；
+ *   Novanta ：两块平行板（含 Dual-Plate Top View）、Galilei 望远镜、scanblock。
+ */
+export type CameraPreset =
+  | 'overview'
+  | 'alpha'
+  | 'z'
+  | 'objective'
+  | 'workpiece'
+  | 'plates'
+  | 'plateA'
+  | 'plateB'
+  | 'telescope'
+  | 'galvos';
+
+const CAMERA_PRESETS: Record<Vendor, { key: CameraPreset; label: string }[]> = {
+  scanlab: [
+    { key: 'overview', label: '整机' },
+    { key: 'alpha', label: 'α/β 模块' },
+    { key: 'z', label: 'Z 模块' },
+    { key: 'objective', label: '物镜与振镜' },
+    { key: 'workpiece', label: '工件焦点' },
+  ],
+  novanta: [
+    { key: 'overview', label: 'Overall Isometric' },
+    { key: 'plates', label: 'Dual-Plate Top View' },
+    { key: 'plateA', label: 'Plate A Close-up' },
+    { key: 'plateB', label: 'Plate B Close-up' },
+    { key: 'telescope', label: 'Telescope View' },
+    { key: 'galvos', label: 'XY Galvo View' },
+    { key: 'objective', label: 'Objective / AOI' },
+    { key: 'workpiece', label: 'Workpiece Top' },
+  ],
+};
 
 const MODE_LABELS: { key: AppMode; label: string }[] = [
   { key: 'overview', label: '整机总览' },
@@ -90,6 +139,14 @@ export class Controls {
 
   private stepButton!: HTMLButtonElement;
 
+  /** 技术路线切换按钮。 */
+  private vendorButtons = new Map<Vendor, HTMLButtonElement>();
+
+  /** 快捷视角按钮组（内容随路线变化）。 */
+  private presetGroup!: HTMLElement;
+
+  private presetButtons: { preset: CameraPreset; button: HTMLButtonElement }[] = [];
+
   constructor(state: AppState, handlers: ControlsHandlers) {
     this.state = state;
     this.handlers = handlers;
@@ -97,8 +154,26 @@ export class Controls {
   }
 
   private build(): void {
+    this.buildVendorSwitcher();
     this.buildModeTabs();
     this.buildControlBar();
+  }
+
+  /** 按路线重建快捷视角按钮。 */
+  private rebuildPresetButtons(vendor: Vendor): void {
+    for (const { button } of this.presetButtons) button.remove();
+    this.presetButtons = [];
+    for (const { key, label } of CAMERA_PRESETS[vendor]) {
+      const button = el('button', {
+        class: 'ctl',
+        type: 'button',
+        text: label,
+        'data-preset': key,
+        onclick: () => this.handlers.onCameraPreset(key),
+      }) as HTMLButtonElement;
+      this.presetGroup.appendChild(button);
+      this.presetButtons.push({ preset: key, button });
+    }
   }
 
   private buildModeTabs(): void {
@@ -152,6 +227,42 @@ export class Controls {
     }) as HTMLInputElement;
     this.toggles.set(id, input);
     return el('label', { class: 'toggle' }, [input, label]);
+  }
+
+  /**
+   * 顶部技术路线切换器。
+   *
+   * 放在控制栏最上方、最显眼的位置：读者一进来就该看到"这里有两家公司的实现方式"。
+   * 两条路线各自的光路拓扑完全不同（反射式移束 vs 透射式平板），
+   * 因此切换会重建整条链路与三维场景，而不是同一批镜片换个标签。
+   */
+  private buildVendorSwitcher(): void {
+    const host = document.getElementById('vendor-switch');
+    if (!host) return;
+    host.innerHTML = '';
+    host.appendChild(
+      el('div', { class: 'vendor-switch-caption' }, [
+        el('b', { text: '技术路线' }),
+        el('span', {
+          class: 'dim',
+          text: '两条路线都在讲同一件事：用五个光学自由度同时控制焦点的位置与入射方向',
+        }),
+      ]),
+    );
+    const row = el('div', { class: 'vendor-switch-row' });
+    for (const vendor of VENDORS) {
+      const button = el('button', {
+        class: 'vendor-button',
+        type: 'button',
+        'data-vendor': vendor.key,
+        onclick: () => this.handlers.onVendorChange(vendor.key),
+      }) as HTMLButtonElement;
+      button.appendChild(el('span', { class: 'vendor-name', text: vendor.label }));
+      button.appendChild(el('span', { class: 'vendor-sub', text: vendor.sub }));
+      this.vendorButtons.set(vendor.key, button);
+      row.appendChild(button);
+    }
+    host.appendChild(row);
   }
 
   private buildControlBar(): void {
@@ -278,25 +389,14 @@ export class Controls {
     ]);
     this.axisRow = axisGroup;
 
-    const presetGroup = el('div', { class: 'control-group' }, [
-      el('label', { text: '视角' }),
-      ...(
-        [
-          ['overview', '整机'],
-          ['alpha', 'α/β 模块'],
-          ['z', 'Z 模块'],
-          ['objective', '物镜与振镜'],
-          ['workpiece', '工件焦点'],
-        ] as [CameraPreset, string][]
-      ).map(([key, label]) =>
-        el('button', {
-          class: 'ctl',
-          type: 'button',
-          text: label,
-          onclick: () => this.handlers.onCameraPreset(key),
-        }),
-      ),
-    ]);
+    /**
+     * 视角按钮随路线变化（见 CAMERA_PRESETS）。
+     * Novanta 模式的 Dual-Plate Top View 是理解"两板只做正交倾斜、但位移向量绕光轴转"
+     * 的关键视角，因此排在第一位。
+     */
+    this.presetGroup = el('div', { class: 'control-group' }, [el('label', { text: '视角' })]);
+    this.presetButtons = [];
+    this.rebuildPresetButtons(this.state.vendor);
 
     const toggleGroup = el('div', { class: 'control-group' }, [
       el('label', { text: '显示' }),
@@ -318,6 +418,9 @@ export class Controls {
       this.toggle('showNormals', '镜面法线', true, (v) =>
         this.handlers.onToggleChange({ showNormals: v }),
       ),
+      this.toggle('showMotors', '执行器外形', true, (v) =>
+        this.handlers.onToggleChange({ showMotors: v }),
+      ),
       this.toggle('exploded', '爆炸视图', false, (v) =>
         this.handlers.onToggleChange({ exploded: v }),
       ),
@@ -329,7 +432,7 @@ export class Controls {
       }),
     ]);
 
-    bar.insertBefore(presetGroup, advanced);
+    bar.insertBefore(this.presetGroup, advanced);
     advanced.appendChild(el('div', { class: 'control-row' }, [axisGroup, toggleGroup]));
 
     // ---------- 第 4 行：加工参数（仅加工模式显示） ----------
@@ -376,9 +479,32 @@ export class Controls {
   /** 快照 → 界面。 */
   update(snapshot: AppSnapshot): void {
     document.body.dataset.mode = snapshot.mode;
+    document.body.dataset.vendor = snapshot.vendor;
     for (const [key, input] of this.toggles) {
       input.checked = key === 'play-loop' ? snapshot.loop : Boolean(snapshot.toggles[key as keyof AppToggles]);
     }
+
+    // 路线切换：按钮状态与快捷视角按钮组都要跟着换
+    if (this.lastVendor !== snapshot.vendor) {
+      this.lastVendor = snapshot.vendor;
+      this.rebuildPresetButtons(snapshot.vendor);
+      const title = document.getElementById('brand-title');
+      if (title) {
+        title.textContent =
+          snapshot.vendor === 'novanta' ? NOVANTA_TITLE.nameZh : 'precSYS 五轴硬件光路';
+      }
+      const subtitle = document.getElementById('brand-subtitle');
+      if (subtitle) {
+        subtitle.textContent =
+          snapshot.vendor === 'novanta'
+            ? NOVANTA_TITLE.subtitleZh
+            : '教学型三维交互模型 · X / Y / Z / α / β 五轴激光扫描子系统';
+      }
+    }
+    for (const [vendor, button] of this.vendorButtons) {
+      button.setAttribute('aria-pressed', String(vendor === snapshot.vendor));
+    }
+
     const processSelect = document.querySelector<HTMLSelectElement>('[aria-label="加工模式"]');
     if (processSelect) processSelect.value = snapshot.process.mode;
     const taperSelect = document.querySelector<HTMLSelectElement>('[aria-label="孔壁趋势"]');
@@ -396,7 +522,7 @@ export class Controls {
 
     setSlider('x', snapshot.command.xMm, 3, 'mm');
     setSlider('y', snapshot.command.yMm, 3, 'mm');
-    setSlider('z', snapshot.command.zMm, 3, 'mm');
+    setSlider('z', snapshot.command.zMm, 4, 'mm');
     setSlider('alpha', snapshot.command.alphaDeg, 2, '°');
     setSlider('beta', snapshot.command.betaDeg, 2, '°');
     setSlider('theta', (((snapshot.theta * 180) / Math.PI) % 360 + 360) % 360, 0, '°');
@@ -418,7 +544,7 @@ export class Controls {
     this.renderReadout(snapshot);
     const geometryCard = document.getElementById('geometry-card');
     if (geometryCard) {
-      const status = geometryStatus(snapshot.trace);
+      const status = geometryStatus(snapshot.trace.trace, snapshot.vendor);
       if (!geometryCard.firstElementChild) geometryCard.innerHTML = status.html;
       const message = geometryCard.querySelector('[role="status"]');
       if (message) {
@@ -430,33 +556,70 @@ export class Controls {
     }
   }
 
+  /** 记住上一次渲染的路线，用于检测切换。 */
+  private lastVendor: Vendor | null = null;
+
   private renderModuleCard(snapshot: AppSnapshot): void {
     const mode = MODE_LABELS.find((m) => m.key === snapshot.mode)?.label ?? '';
+    const novanta = snapshot.vendor === 'novanta';
     const modeIntro: Record<AppMode, { summary: string; parts: string[] }> = {
-      overview: {
-        summary:
-          '从激光入口到工件的完整光路，加上控制电子学、水冷、吹扫、监测与外围系统。先建立"这套东西在哪、由什么组成"的整体印象。',
-        parts: ['激光入口与光束调理', 'α/β 平行移束模块', 'Z 调焦等效模块', '两片振镜', '物镜与工件'],
-      },
-      axes: {
-        summary:
-          '逐个执行轴单独演示：拖动或播放任一轴，观察它到底改变了光束的哪一个量。',
-        parts: ['X 振镜→焦点 X', 'Y 振镜→焦点 Y', 'Z 模块→焦点 Z', 'α 模块→入射角 α', 'β 模块→入射角 β'],
-      },
+      overview: novanta
+        ? {
+            summary:
+              '从激光入口到工件的完整光路：两块平行玻璃板（wobble unit）→ Galilei 扩束望远镜 / 动态调焦 → scanblock 两片振镜 → 物镜 → 工件。',
+            parts: [
+              '激光入口与光束衰减单元',
+              '两块透射式平行平板',
+              'Galilei 望远镜 / 动态调焦',
+              'XY 振镜（scanblock）',
+              '物镜与工件',
+            ],
+          }
+        : {
+            summary:
+              '从激光入口到工件的完整光路，加上控制电子学、水冷、吹扫、监测与外围系统。先建立"这套东西在哪、由什么组成"的整体印象。',
+            parts: ['激光入口与光束调理', 'α/β 平行移束模块', 'Z 调焦等效模块', '两片振镜', '物镜与工件'],
+          },
+      axes: novanta
+        ? {
+            summary:
+              '逐个执行轴单独演示：两块平板各自绕正交轴倾斜、望远镜镜组轴向移动、两片振镜转动，观察每一个改变了光束的哪一个量。',
+            parts: [
+              'X 振镜 → 焦点 X',
+              'Y 振镜 → 焦点 Y',
+              '望远镜 Z 执行器 → 焦点 Z',
+              '平板 B 倾斜 → AOI X 分量',
+              '平板 A 倾斜 → AOI Y 分量',
+            ],
+          }
+        : {
+            summary:
+              '逐个执行轴单独演示：拖动或播放任一轴，观察它到底改变了光束的哪一个量。',
+            parts: ['X 振镜→焦点 X', 'Y 振镜→焦点 Y', 'Z 模块→焦点 Z', 'α 模块→入射角 α', 'β 模块→入射角 β'],
+          },
       linked: {
         summary:
           '五个轴同时工作。关掉联合补偿可以看到真实的耦合误差，打开后五个执行轴一起把目标解到位。',
         parts: ['耦合矩阵', '残差', '五个执行轴'],
       },
-      process: {
-        summary:
-          '冲击、环切、螺旋、五轴进动四种策略对比。进动时焦点绕圆周运动、入射角同步旋转。',
-        parts: ['焦点轨迹', '倾斜向量', '孔壁趋势', '慢放倍率'],
-      },
+      process: novanta
+        ? {
+            summary:
+              '两块平行板按正弦 / 相移正弦倾斜，合成的平行位移绕光轴画圆；对比"简单 sin/cos"与"精确圆补偿"两种策略的圆度。',
+            parts: ['平板机械角', '合成位移轨迹', '非圆度', '补偿策略'],
+          }
+        : {
+            summary:
+              '冲击、环切、螺旋、五轴进动四种策略对比。进动时焦点绕圆周运动、入射角同步旋转。',
+            parts: ['焦点轨迹', '倾斜向量', '孔壁趋势', '慢放倍率'],
+          },
       calibration: {
-        summary:
-          '监测分光元件与光束位置测量单元检测光束状态，Automatic Fine Adjustment 用五轴做小量补偿。',
-        parts: ['分光元件', '光束位置测量单元', '补偿前后的入瞳偏心'],
+        summary: novanta
+          ? '本路线公开资料中没有等价的分光监测与自动精调单元；此模式列出这一点，并说明五轴为什么仍然必须联合标定。'
+          : '监测分光元件与光束位置测量单元检测光束状态，Automatic Fine Adjustment 用五轴做小量补偿。',
+        parts: novanta
+          ? ['未公开项说明', '耦合来源', '五轴联合求解']
+          : ['分光元件', '光束位置测量单元', '补偿前后的入瞳偏心'],
       },
       evidence: {
         summary: '把页面里每一条信息的来源、可信等级和已知的未知项列出来。',
@@ -470,24 +633,31 @@ export class Controls {
       <p>${intro.summary}</p>
       <h3>本模式关注</h3>
       <p class="dim">${intro.parts.join(' · ')}</p>
+      <h3>当前技术路线</h3>
+      <p class="dim">${
+        novanta
+          ? `${NOVANTA_TITLE.nameZh}<br />${NOVANTA_TITLE.subtitleZh}`
+          : 'SCANLAB precSYS —— 反射式平行移束（三镜四反射）+ 振镜 + 反射式 Z 等效模块。'
+      }</p>
       <h3>固定说明</h3>
-      <p class="dim">${PUBLIC_SPECS_UI.disclaimer}</p>
+      <p class="dim">${novanta ? NOVANTA_DISCLAIMER : PUBLIC_SPECS_UI.disclaimer}</p>
     `;
   }
 
   private renderReadout(snapshot: AppSnapshot): void {
-    const { command, achieved, residual, actuators, trace, inverse } = snapshot;
+    const { command, achieved, residual, inverse } = snapshot;
+    const trace = commonTrace(snapshot.trace);
+    const readout = snapshot.actuatorReadout;
     const pupil = trace.pupil;
     const fmt = (v: number, digits = 3) => v.toFixed(digits);
     const err = (v: number) => Math.abs(v) > 0.02;
 
-    const actuatorRows = `
-      <dt>q₁ X 振镜</dt><dd>${fmt((actuators.xRad * 180) / Math.PI, 3)} °</dd>
-      <dt>q₂ Y 振镜</dt><dd>${fmt((actuators.yRad * 180) / Math.PI, 3)} °</dd>
-      <dt>q₃ Z 执行器</dt><dd>${fmt(actuators.zDeg, 3)} °</dd>
-      <dt>q₄ α 可动镜</dt><dd>${fmt((actuators.alphaRad * 180) / Math.PI, 3)} °</dd>
-      <dt>q₅ β 可动镜</dt><dd>${fmt((actuators.betaRad * 180) / Math.PI, 3)} °</dd>
-    `;
+    const actuatorRows = readout.labels
+      .map(
+        (label, i) =>
+          `<dt>q${['₁', '₂', '₃', '₄', '₅'][i]} ${label}</dt><dd>${fmt(readout.values[i], 4)} ${readout.units[i]}</dd>`,
+      )
+      .join('');
 
     const matrix =
       snapshot.mode === 'linked' || snapshot.mode === 'axes'
@@ -497,13 +667,13 @@ export class Controls {
     this.readoutCard.innerHTML = `
       <h2>工程量 / 执行器量</h2>
       <dl class="kv">
-        <dt>设定 X / Y / Z</dt><dd>${fmt(command.xMm, 3)} / ${fmt(command.yMm, 3)} / ${fmt(command.zMm, 3)} mm</dd>
+        <dt>设定 X / Y / Z</dt><dd>${fmt(command.xMm, 3)} / ${fmt(command.yMm, 3)} / ${fmt(command.zMm, 4)} mm</dd>
         <dt>设定 AOI α / β</dt><dd>${fmt(command.alphaDeg, 2)} / ${fmt(command.betaDeg, 2)} °</dd>
-        <dt>实际 X / Y / Z</dt><dd class="${err(residual.xMm) || err(residual.yMm) || err(residual.zMm) ? 'warn' : 'good'}">${fmt(achieved.xMm, 3)} / ${fmt(achieved.yMm, 3)} / ${fmt(achieved.zMm, 3)} mm</dd>
+        <dt>实际 X / Y / Z</dt><dd class="${err(residual.xMm) || err(residual.yMm) || err(residual.zMm) ? 'warn' : 'good'}">${fmt(achieved.xMm, 3)} / ${fmt(achieved.yMm, 3)} / ${fmt(achieved.zMm, 4)} mm</dd>
         <dt>实际 AOI α / β</dt><dd class="${err(residual.alphaDeg) || err(residual.betaDeg) ? 'warn' : 'good'}">${fmt(achieved.alphaDeg, 2)} / ${fmt(achieved.betaDeg, 2)} °</dd>
-        <dt>残差（实际−设定）</dt><dd class="${err(residual.xMm) || err(residual.alphaDeg) ? 'warn' : 'good'}">(${fmt(residual.xMm, 3)}, ${fmt(residual.yMm, 3)}, ${fmt(residual.zMm, 3)}, ${fmt(residual.alphaDeg, 2)}, ${fmt(residual.betaDeg, 2)})</dd>
+        <dt>残差（实际−设定）</dt><dd class="${err(residual.xMm) || err(residual.alphaDeg) ? 'warn' : 'good'}">(${fmt(residual.xMm, 3)}, ${fmt(residual.yMm, 3)}, ${fmt(residual.zMm, 4)}, ${fmt(residual.alphaDeg, 2)}, ${fmt(residual.betaDeg, 2)})</dd>
       </dl>
-      <h3>五个执行轴</h3>
+      <h3>五个执行轴（当前路线）</h3>
       <dl class="kv">${actuatorRows}</dl>
       <h3>物镜入瞳状态</h3>
       <dl class="kv">
@@ -511,14 +681,22 @@ export class Controls {
         <dt>入瞳坡度 u / v</dt><dd>${fmt(pupil.u, 5)} / ${fmt(pupil.v, 5)}</dd>
         <dt>光束半径</dt><dd>${fmt(pupil.radiusMm, 3)} mm</dd>
         <dt>会聚度</dt><dd>${pupil.vergence.toExponential(2)} /mm</dd>
-        <dt>光锥全角</dt><dd>${fmt(trace.focus.coneHalfAngleRad * 2, 4)} rad</dd>
         <dt>求解方式</dt><dd>${inverse.compensated ? `联合补偿（${inverse.iterations} 次迭代）` : '一轴对应一坐标'}</dd>
         ${inverse.saturated ? '<dt>行程</dt><dd class="warn">有执行轴到限位</dd>' : ''}
+        ${inverse.traceFailed ? '<dt>追迹</dt><dd class="warn">追迹失败，残差不可信</dd>' : ''}
       </dl>
       ${matrix}
       <h3>视觉放大说明</h3>
-      <p class="dim">三维光路与镜片共用同一坐标；侧栏局部图放大焦点运动与倾角。Z 模块使用平面反射与等效光焦度表示，不将曲面放大变形当作实机结构。</p>
-      <p class="dim">${PUBLIC_SPECS_UI.inverseNote}</p>
+      <p class="dim">${
+        snapshot.vendor === 'novanta'
+          ? '三维光路与两块平行板、望远镜、振镜共用同一坐标；玻璃材质的折射只用于视觉表现，光线路径与读数全部来自向量 Snell 追迹。侧栏 Top View 面板放大显示位移轨迹与当前 offset 向量。'
+          : '三维光路与镜片共用同一坐标；侧栏局部图放大焦点运动与倾角。Z 模块使用平面反射与等效光焦度表示，不将曲面放大变形当作实机结构。'
+      }</p>
+      <p class="dim">${
+        snapshot.vendor === 'novanta'
+          ? '本逆映射与"精确圆补偿"均为教学等效实现：控制器内部的真实补偿算法、标定矩阵与伺服参数未公开。'
+          : PUBLIC_SPECS_UI.inverseNote
+      }</p>
     `;
   }
 
@@ -542,7 +720,7 @@ export class Controls {
     return `
       <h3>耦合矩阵（归一化）</h3>
       <table class="matrix"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>
-      <p class="dim">对角线为各执行轴对自身工程量的灵敏度（归一为 1）；非对角线就是"一轴对应一坐标"会漏掉的耦合项。数值由本模型有限差分求得，不是 SCANLAB 的真实标定数据。</p>
+      <p class="dim">对角线为各执行轴对自身工程量的灵敏度（归一为 1）；非对角线就是"一轴对应一坐标"会漏掉的耦合项。数值由本模型在当前工况点做有限差分求得，**不是厂家的真实标定数据**。</p>
     `;
   }
 

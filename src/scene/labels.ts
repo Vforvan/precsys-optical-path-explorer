@@ -78,7 +78,7 @@ export function createLabels(train: OpticalTrain): { group: Group; items: LabelE
   add('z-module', 'Z 动态调焦等效模块', '教学等效', new Vector3(
     BEAM_PATH.afterBeta.x - 46,
     BEAM_PATH.afterBeta.y - 16,
-    AXIS.zGalvo,
+    AXIS.zLens2,
   ), '改变物镜前光束会聚状态 → 移动焦点 Z');
 
   add('galvo-y', 'Y 振镜（教学排布）', '教学等效', new Vector3(

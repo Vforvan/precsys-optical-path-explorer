@@ -70,10 +70,10 @@ export const AXIS = {
   galvoPlane: 150,
   /** 监测分光元件。 */
   monitoringSplitter: 176,
-  /** Z 模块：可动折转镜 / 变焦反射镜 / 随动折返镜。 */
-  zGalvo: 240,
-  zCurvedMirror: 240,
-  zFoldMirror: 218,
+  /** 三透镜教学 Z 模块：L2 固定、L1/L3 移动。 */
+  zLens1: 264,
+  zLens2: 252,
+  zLens3: 240,
   /** β 平行移束模块（沿 Y 移束）的输出高度。 */
   betaModuleOut: 330,
   /** α 平行移束模块（沿 X 移束）的输出高度。 */
@@ -144,19 +144,13 @@ export const SHIFT_MODULE = {
 
 /** Z 动态调焦等效模块的几何。 */
 export const FOCUS_MODULE = {
-  /** 折转镜到变焦反射镜的水平距离（越小，"Z 变化带出的入瞳偏心"耦合越小）。 */
-  armMm: 26,
-  /** 折返镜相对折转镜的高度差。
-   *  必须大于两片镜面各自的 Z 向半投影（20 mm 的 45° 镜片 ≈ 14 mm），
-   *  否则两块镜片会互相重叠 —— 早期取 16 mm 时确实重叠了。 */
-  dropMm: 34,
-  /** 镜片边长。 */
-  mirrorSizeMm: 20,
-  /** 输出会聚度标定：每度执行器角对应的镜面功率（1/mm）。
-   *  取值使 ±1 mm 焦点范围只需约 ±0.8° 执行器角，从而把
-   *  "Z 变化 → 光束在折返镜上落点移动 → 入瞳偏心" 的耦合限制在
-   *  可控范围内（实机同样由控制器联合补偿）。 */
-  powerPerDeg: 1.0e-3,
+  /** 凸/凹/凸方案有专利依据；以下焦距、间距、尺寸及联动规律为教学选取。 */
+  focalLengthsMm: [36, -12, 36] as const,
+  spacingMm: 12,
+  lensDiameterMm: 20,
+  lensThicknessMm: 2,
+  maxTravelMm: 2,
+  l1TravelRatio: 0.25,
 } as const;
 
 /** 物镜内部等效结构（对应公开的"焦距 75 mm / 有效焦距 25 mm"）。 */

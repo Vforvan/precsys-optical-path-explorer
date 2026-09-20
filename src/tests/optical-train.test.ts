@@ -80,10 +80,10 @@ describe('五轴链路总装与光线追迹', () => {
     expect(Math.abs(t.focus.xMm)).toBeLessThan(1e-9);
   });
 
-  it('Z 执行器改变焦点高度，同时带来入瞳偏心的耦合（需联合补偿）', () => {
-    const up = traceTrain(train, { ...ZERO_ACTUATORS, zDeg: 0.76 });
+  it('Z 同轴移动改变焦点高度；轴上光束不再产生虚构横向偏移', () => {
+    const up = traceTrain(train, { ...ZERO_ACTUATORS, zTravelMm: 2 });
     expect(up.focus.zMm).toBeGreaterThan(0.9);
-    expect(Math.abs(up.pupil.hxMm)).toBeGreaterThan(1);
+    expect(Math.abs(up.pupil.hxMm)).toBeLessThan(1e-8);
   });
 
   it('三个型号的光锥角都符合公开规格', () => {
@@ -131,7 +131,7 @@ describe('五轴联合逆映射（educationalInverseModel）', () => {
       const { actuators } = educationalInverseModel(train, cmd);
       expect(Math.abs(actuators.xRad)).toBeLessThanOrEqual(ACTUATOR_LIMITS.xRad + 1e-9);
       expect(Math.abs(actuators.yRad)).toBeLessThanOrEqual(ACTUATOR_LIMITS.yRad + 1e-9);
-      expect(Math.abs(actuators.zDeg)).toBeLessThanOrEqual(ACTUATOR_LIMITS.zDeg + 1e-9);
+      expect(Math.abs(actuators.zTravelMm)).toBeLessThanOrEqual(ACTUATOR_LIMITS.zTravelMm + 1e-9);
       expect(Math.abs(actuators.alphaRad)).toBeLessThanOrEqual(ACTUATOR_LIMITS.alphaRad + 1e-9);
       expect(Math.abs(actuators.betaRad)).toBeLessThanOrEqual(ACTUATOR_LIMITS.betaRad + 1e-9);
     }
@@ -157,8 +157,8 @@ describe('五轴联合逆映射（educationalInverseModel）', () => {
       betaDeg: 0,
     });
     expect(zPlus.achieved.zMm).toBeCloseTo(1, 2);
-    expect(zPlus.actuators.zDeg).toBeLessThan(ACTUATOR_LIMITS.zDeg);
-    expect(zPlus.actuators.zDeg).toBeGreaterThan(0.3);
+    expect(zPlus.actuators.zTravelMm).toBeLessThan(ACTUATOR_LIMITS.zTravelMm);
+    expect(zPlus.actuators.zTravelMm).toBeGreaterThan(0.3);
   });
 
   it('可动镜机械角很小：±7.5° 入射角只需约 1.5° 机械角', () => {
@@ -169,7 +169,7 @@ describe('五轴联合逆映射（educationalInverseModel）', () => {
       alphaDeg: 7.5,
       betaDeg: 0,
     });
-    const mechanicalDeg = radToDeg(result.actuators.alphaRad);
+    const mechanicalDeg = Math.abs(radToDeg(result.actuators.alphaRad));
     expect(mechanicalDeg).toBeGreaterThan(0.5);
     expect(mechanicalDeg).toBeLessThan(2.5);
   });
@@ -187,7 +187,7 @@ describe('场景几何自洽性', () => {
   });
 
   it('Z 模块输出点位于模块下游光轴上', () => {
-    expect(train.focusModule.fold.center.x).toBeCloseTo(BEAM_PATH.afterBeta.x, 6);
-    expect(train.focusModule.fold.center.y).toBeCloseTo(BEAM_PATH.afterBeta.y, 6);
+    expect(train.focusModule.lenses[2].center.x).toBeCloseTo(BEAM_PATH.afterBeta.x, 6);
+    expect(train.focusModule.lenses[2].center.y).toBeCloseTo(BEAM_PATH.afterBeta.y, 6);
   });
 });

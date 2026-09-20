@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "check": "tsc --noEmit",
     "verify:page": "node tools/check-file-open.mjs",
-    "verify:demo": "node tools/verify-demo.mjs"
+    "verify:demo": "node tools/verify-demo.mjs",
+    "verify:novanta": "node tools/verify-novanta.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

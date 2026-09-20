@@ -4,6 +4,7 @@ import { mirrorAxes, mirrorCenter, mirrorNormal, type MirrorSpec } from '../opti
 import { OPTICS_VARIANTS } from '../config/public-specs';
 import { DEG } from '../optics/ray';
 import { FOCUS_MODULE, GALVO, SHIFT_MODULE } from '../config/layout';
+import { focusLensesAt } from '../optics/focus-module';
 
 /**
  * 实体镜片不得互相穿插。
@@ -18,9 +19,8 @@ const HALF_EPS = 1e-6;
 
 /** 镜片厚度按类型取（厚度是建模常量，不在 MirrorSpec 上）。 */
 function plateThickness(spec: MirrorSpec): number {
-  if (spec.id.startsWith('z-')) return FOCUS_MODULE.mirrorSizeMm >= 20 ? 2.6 : 2.6;
+  if (spec.kind === 'lens') return FOCUS_MODULE.lensThicknessMm;
   if (spec.id.startsWith('galvo-')) return GALVO.mirrorThicknessMm;
-  if (spec.id === 'z-galvo' || spec.id === 'z-fold') return GALVO.mirrorThicknessMm;
   return SHIFT_MODULE.plateThickness;
 }
 
@@ -70,16 +70,16 @@ const train = createOpticalTrain(OPTICS_VARIANTS[0]);
 
 /** 采样若干执行器状态（可动件在两个极端也要检查）。 */
 const states: ActuatorState[] = [
-  { alphaRad: 0, betaRad: 0, zDeg: 0, xRad: 0, yRad: 0 },
-  { alphaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG, betaRad: -SHIFT_MODULE.mechanicalRangeDeg * DEG, zDeg: 1.4, xRad: 0.05, yRad: -0.05 },
-  { alphaRad: -SHIFT_MODULE.mechanicalRangeDeg * DEG, betaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG, zDeg: -1.4, xRad: -0.05, yRad: 0.05 },
+  { alphaRad: 0, betaRad: 0, zTravelMm: 0, xRad: 0, yRad: 0 },
+  { alphaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG, betaRad: -SHIFT_MODULE.mechanicalRangeDeg * DEG, zTravelMm: 1.4, xRad: 0.05, yRad: -0.05 },
+  { alphaRad: -SHIFT_MODULE.mechanicalRangeDeg * DEG, betaRad: SHIFT_MODULE.mechanicalRangeDeg * DEG, zTravelMm: -1.4, xRad: -0.05, yRad: 0.05 },
 ];
 
 /** 同一模块内的镜片组合（不同模块之间本来就可能隔着很远或共面，不做要求）。 */
 const pairs: [string, MirrorSpec, MirrorSpec][] = [
-  ['Z 模块：折转镜 / 折返镜', train.focusModule.galvo, train.focusModule.fold],
-  ['Z 模块：折转镜 / 变焦镜', train.focusModule.galvo, train.focusModule.curved],
-  ['Z 模块：折返镜 / 变焦镜', train.focusModule.fold, train.focusModule.curved],
+  ['Z 模块：L1 / L2', train.focusModule.lenses[0], train.focusModule.lenses[1]],
+  ['Z 模块：L2 / L3', train.focusModule.lenses[1], train.focusModule.lenses[2]],
+  ['Z 模块：L1 / L3', train.focusModule.lenses[0], train.focusModule.lenses[2]],
   ['α 模块：可动入光 / 可动出光', train.alphaModule.movableIn, train.alphaModule.movableOut],
   ['α 模块：可动入光 / 固定镜 1', train.alphaModule.movableIn, train.alphaModule.fixed1],
   ['α 模块：可动出光 / 固定镜 2', train.alphaModule.movableOut, train.alphaModule.fixed2],
@@ -97,18 +97,22 @@ describe('镜片实体互不穿插', () => {
           if (spec.id.startsWith('beta')) return state.betaRad;
           return 0;
         };
-        const boxA = obb(a, angleFor(a));
-        const boxB = obb(b, angleFor(b));
+        const lensAt = (spec: MirrorSpec) => focusLensesAt(train.focusModule, state.zTravelMm).find(l => l.id === spec.id) ?? spec;
+        const boxA = obb(lensAt(a), angleFor(a));
+        const boxB = obb(lensAt(b), angleFor(b));
         expect(
           intersects(boxA, boxB),
-          `${label} 在 zDeg=${state.zDeg}°、α=${(state.alphaRad / DEG).toFixed(1)}° 时相交`,
+          `${label} 在 zTravelMm=${state.zTravelMm}°、α=${(state.alphaRad / DEG).toFixed(1)}° 时相交`,
         ).toBe(false);
       }
     });
   }
 
-  it('Z 模块折转镜与折返镜的轴向间距足够放下两片镜片', () => {
-    const halfProjection = (FOCUS_MODULE.mirrorSizeMm / 2) * Math.SQRT2; // 45° 镜片的 Z 向半投影
-    expect(FOCUS_MODULE.dropMm).toBeGreaterThan(2 * halfProjection * 0.95);
+  it('Z 全行程内，三片透镜轴向间距大于玻璃厚度', () => {
+    for (const q of [-2, 0, 2]) {
+      const lenses = focusLensesAt(train.focusModule, q);
+      expect(lenses[0].center.z - lenses[1].center.z).toBeGreaterThan(FOCUS_MODULE.lensThicknessMm);
+      expect(lenses[1].center.z - lenses[2].center.z).toBeGreaterThan(FOCUS_MODULE.lensThicknessMm);
+    }
   });
 });

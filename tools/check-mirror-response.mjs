@@ -86,7 +86,7 @@ function quatDelta(a, b) {
   return (2 * Math.acos(Math.min(1, dot)) * 180) / Math.PI;
 }
 
-console.log('Z 执行器角：', moved.snap.actuators.zDeg.toFixed(3), '°');
+console.log('Z 执行器角：', moved.snap.actuators.actuators.zTravelMm.toFixed(3), '°');
 console.log('电机显示角：', JSON.stringify(moved.motorAngles, null, 0));
 console.log('\n部件            网格姿态变化     位置变化(mm)    trace 法向变化');
 for (const id of ids) {

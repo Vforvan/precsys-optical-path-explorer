@@ -134,7 +134,7 @@ describe('进动工况能被五轴模型解出来（倾斜向量随相位旋转�
     // 五个执行轴都是"小角度摆动"，没有整周旋转量
     expect(Math.abs(solved.actuators.xRad)).toBeLessThan(0.2);
     expect(Math.abs(solved.actuators.yRad)).toBeLessThan(0.2);
-    expect(Math.abs(solved.actuators.zDeg)).toBeLessThan(2);
+    expect(Math.abs(solved.actuators.zTravelMm)).toBeLessThan(2);
     expect(Math.abs(solved.actuators.alphaRad)).toBeLessThan(0.1);
     expect(Math.abs(solved.actuators.betaRad)).toBeLessThan(0.1);
     // 物镜与振镜中心固定不动

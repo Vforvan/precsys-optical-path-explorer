@@ -113,7 +113,7 @@ export const TOUR_STEPS: TourStep[] = [
       '此处的镜组结构是教学等效模型，不代表 precSYS 内部真实排布。',
     ],
     highlight: ['z-galvo', 'z-curved', 'z-fold', 'objective'],
-    camera: { target: [BEAM_PATH.afterBeta.x, BEAM_PATH.afterBeta.y, AXIS.zGalvo], distance: 260 },
+    camera: { target: [BEAM_PATH.afterBeta.x, BEAM_PATH.afterBeta.y, AXIS.zLens2], distance: 260 },
     axisDemo: 'z',
     play: true,
   },

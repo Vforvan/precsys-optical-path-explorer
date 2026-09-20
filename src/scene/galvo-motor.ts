@@ -5,7 +5,11 @@ import type { MirrorSpec } from '../optics/mirror';
 
 export interface GalvoMotor {
   group: Group;
-  update(angle: number): void;
+  /**
+   * @param value 驱动转子的量（转动轴为机械角 rad；直线轴可传等效指针角）。
+   * @param displayValue 读数显示的真实工程量（度或 mm）。不传时等于 value。
+   */
+  update(value: number, displayValue?: number): void;
 }
 
 /**
@@ -16,8 +20,25 @@ export interface GalvoMotor {
  */
 export const MOTOR_ARC_GAIN = 12;
 
-/** 定子固定在旋转轴上；转轴与转子按真实机械角转动，外置读数帮助辨认小角度摆动。 */
-export function createGalvoMotor(spec: MirrorSpec, name: string): GalvoMotor {
+/**
+ * 定子固定在旋转轴上；转轴与转子按真实机械角转动，外置读数帮助辨认小角度摆动。
+ *
+ * @param name  轴标识（'X' / 'Y' / 'α' / 'β' …）。它同时决定转向符号与读数的默认前缀。
+ * @param labelPrefix 读数前缀（可选）。Novanta 路线的执行轴叫"平板 A/B 机械倾角"，
+ *                    不能沿用 SCANLAB 的"α 电机 / β 电机"，因此允许单独指定；
+ *                    不传时与原来一致，用 name 本身。
+ * @param mountOffsetMm 沿旋转轴把整台电机外移的距离（可选）。
+ *                    平行平板的执行器必须装到**板的外缘之外**：板的转轴与板心在同一点
+ *                    （都在光轴上），不偏移的话电机壳体会压在玻璃板与标签上。
+ * @param unit 读数单位（默认 '°'）。直线执行器（Z）应传 'mm'，且 scale 用于把毫米折算成指针角。
+ */
+export function createGalvoMotor(
+  spec: MirrorSpec,
+  name: string,
+  labelPrefix?: string,
+  mountOffsetMm = 0,
+  unit: '°' | 'mm' = '°',
+): GalvoMotor {
   const group = new Group();
   group.name = `motor-${name}`;
   group.userData.partId = spec.id;
@@ -25,9 +46,10 @@ export function createGalvoMotor(spec: MirrorSpec, name: string): GalvoMotor {
   const axis = (spec.rotationAxis ?? spec.v).clone().normalize();
   const directionSign = name === 'Y' ? -1 : 1;
   axis.multiplyScalar(directionSign);
-  group.position.copy(spec.rotationPivot ?? spec.center);
-  group.quaternion.setFromUnitVectors(new Vector3(0,0,1), axis);
+  group.position.copy(spec.rotationPivot ?? spec.center).addScaledVector(axis, mountOffsetMm);
+  group.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), axis);
   const reach = spec.size.v / 2 + 8;
+  const readoutName = labelPrefix ?? `${name} 电机`;
   const casing = new MeshStandardMaterial({ color: '#315966', metalness: 0.7, roughness: 0.35 });
   const silver = new MeshStandardMaterial({ color: '#bacbd4', metalness: 0.75, roughness: 0.28 });
   const signal = new MeshStandardMaterial({ color: '#ffaa55', emissive: '#ff8c35', emissiveIntensity: 0.1 });
@@ -89,20 +111,28 @@ export function createGalvoMotor(spec: MirrorSpec, name: string): GalvoMotor {
     group.add(object);
   }
   let previous = 0;
+  let previousDisplay = 0;
   return {
     group,
-    update(angle) {
-      const moving = Math.abs(angle - previous) > 1e-8;
-      previous = angle;
-      rotor.rotation.z = angle * directionSign;
-      updateArc(angle);
+    /**
+     * @param value 用于**驱动转子的量**（转动轴为机械角 rad；直线轴可传等效指针角）。
+     * @param displayValue 用于**读数显示的真实工程量**（度或 mm）。不传时等于 value。
+     */
+    update(value: number, displayValue?: number) {
+      const shown = displayValue ?? value;
+      const moving = Math.abs(value - previous) > 1e-8 || Math.abs(shown - previousDisplay) > 1e-9;
+      previous = value;
+      previousDisplay = shown;
+      rotor.rotation.z = value * directionSign;
+      updateArc(value);
       signal.emissiveIntensity = moving ? 1.8 : 0.1;
-      group.userData.angleRad = angle;
+      group.userData.angleRad = shown;
       group.userData.moving = moving;
       if (label) {
         label.classList.toggle('moving', moving);
-        // 括号里注明指示弧已放大，避免读者把弧长当成真实角度
-        label.textContent = `${name} 电机 ${(angle * 180 / Math.PI).toFixed(2)}° ${moving ? '↔' : '·'} ×${MOTOR_ARC_GAIN}`;
+        // 括号里注明指示弧已放大，避免读者把弧长当成真实角度/行程
+        const text = unit === 'mm' ? shown.toFixed(3) : ((shown * 180) / Math.PI).toFixed(2);
+        label.textContent = `${readoutName} ${text}${unit} ${moving ? '↔' : '·'} ×${MOTOR_ARC_GAIN}`;
       }
     },
   };

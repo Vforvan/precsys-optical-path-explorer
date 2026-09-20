@@ -115,7 +115,7 @@ const alive = await page.evaluate(() => {
     actuators: {
       x: (snapshot.actuators.xRad * 180) / Math.PI,
       y: (snapshot.actuators.yRad * 180) / Math.PI,
-      z: snapshot.actuators.zDeg,
+      z: snapshot.actuators.zTravelMm,
       a: (snapshot.actuators.alphaRad * 180) / Math.PI,
       b: (snapshot.actuators.betaRad * 180) / Math.PI,
     },

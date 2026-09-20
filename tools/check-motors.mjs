@@ -51,7 +51,7 @@ const report = await page.evaluate(() => {
   state.setAxisDemo('none');
   state.setCommand({ xMm: 1.2, yMm: -1.2, zMm: 1, alphaDeg: 6, betaDeg: -6 });
   const snap = state.snapshot();
-  const a = snap.actuators;
+  const a = snap.actuators.actuators;
 
   // 名义法向：从 train 里取（angleRad = 0 的那份）
   const nominal = {};
@@ -81,7 +81,7 @@ const report = await page.evaluate(() => {
 
   // 各镜片的实际转角（由本帧 trace 法向求得）
   const hitsById = {};
-  for (const hit of snap.trace.hits) hitsById[hit.mirrorId] = hit;
+  for (const hit of snap.trace.trace.hits) hitsById[hit.mirrorId] = hit;
 
   /** 由名义法向与 trace 法向求"带符号"的镜片转角（绕该镜片自身转轴，右手为正）。 */
   const signedRotationDeg = (id) => {
@@ -112,7 +112,7 @@ const report = await page.evaluate(() => {
     actuatorsDeg: {
       x: (a.xRad * 180) / Math.PI,
       y: (a.yRad * 180) / Math.PI,
-      z: a.zDeg,
+      z: a.zTravelMm,
       alpha: (a.alphaRad * 180) / Math.PI,
       beta: (a.betaRad * 180) / Math.PI,
     },

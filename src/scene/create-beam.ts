@@ -25,6 +25,7 @@ import {
   Vector3,
 } from 'three';
 import type { TrainTrace } from '../optics/optical-train';
+import type { AnyTrainTrace } from '../app-state';
 import { OBJECTIVE, AXIS } from '../config/layout';
 import { COLORS, VISUAL_GAIN } from '../config/visual-scale';
 import type { SceneMaterials } from './create-scene';
@@ -46,7 +47,8 @@ export interface BeamView {
   focusMarker: Mesh;
   /** 进动轨迹尾迹。 */
   trail: Line;
-  update(trace: TrainTrace, ghost: TrainTrace | null, options: BeamOptions): void;
+  /** 传入带标签的联合，实现内部按 vendor 收窄（见 scene/chain-view.ts）。 */
+  update(trace: AnyTrainTrace, ghost: AnyTrainTrace | null, options: BeamOptions): void;
   /** 追加轨迹点（加工演示用）。 */
   pushTrailPoint(point: Vector3): void;
   clearTrail(): void;
@@ -208,7 +210,11 @@ export function createBeamView(materials: SceneMaterials): BeamView {
 
   let trailCount = 0;
 
-  const update = (trace: TrainTrace, ghost: TrainTrace | null, options: BeamOptions) => {
+  const update = (traceRaw: AnyTrainTrace, ghostRaw: AnyTrainTrace | null, options: BeamOptions) => {
+    // 本实现只处理 SCANLAB 链路；另一条路线的折线与它无关（见 novanta-beam.ts）。
+    if (traceRaw.vendor !== 'scanlab') return;
+    const trace: TrainTrace = traceRaw.trace;
+    const ghost: TrainTrace | null = ghostRaw && ghostRaw.vendor === 'scanlab' ? ghostRaw.trace : null;
     const segments = trace.segments;
     for (let i = 0; i < slots.length; i += 1) {
       const slot = slots[i];

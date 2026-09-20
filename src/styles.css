@@ -304,24 +304,30 @@ body {
 }
 
 /* ---------------- 三维标签 ---------------- */
+/* 场景标签：11px → 10px，并收紧内边距。文字是 overlay 元素，
+   相机拉近时会显得偏大，因此整体压小一档，长说明单独一行且更淡。 */
 .scene-label {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 3px 7px;
-  border-radius: 6px;
-  background: rgba(9, 14, 22, 0.82);
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(9, 14, 22, 0.78);
   border: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.25;
   color: #dfe8f6;
   white-space: nowrap;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  max-width: 190px;
 }
 
 .scene-label-detail {
-  font-size: 9.5px;
-  color: #8fa0b8;
+  font-size: 9px;
+  line-height: 1.2;
+  color: #8496ad;
+  white-space: normal;
 }
 
 .scene-label.trust-public {
@@ -678,7 +684,7 @@ input:focus-visible {
 .panel-card { border-color: #202e40; background: #101925; padding: 14px; }
 #process-presets { border-color: #2a4853; background: linear-gradient(145deg, #142833, #101923 70%); }
 .section-eyebrow { font-size: 10px; letter-spacing: .12em; color: #79b7c0; margin-bottom: 8px; }
-.motor-label { padding: 3px 6px; background: #152735ee; border: 1px solid #51717e; border-radius: 4px; color: #c2d3dd; font: 11px var(--mono); white-space: nowrap; }
+.motor-label { padding: 2px 5px; background: #152735ee; border: 1px solid #51717e; border-radius: 4px; color: #c2d3dd; font: 10px var(--mono); line-height: 1.25; white-space: nowrap; }
 .motor-label.moving { border-color: #ffb56b; color: #ffd4a1; background: #3c2c1fef; }
 #material-detail { position: absolute; right: 14px; bottom: 14px; z-index: 3; width: 310px; background: #0e1a26ed; border: 1px solid #39515f; border-radius: 9px; padding: 10px; }
 .material-title { display: flex; flex-wrap: wrap; gap: 5px; justify-content: space-between; font-size: 12px; color: #cbdfea; }
@@ -755,4 +761,108 @@ body[data-mode="calibration"] #module-card, body[data-mode="evidence"] #module-c
   .trust-legend { display: none; }
   .preset small { font-size: 11px; }
   .ctl, .preset { min-height: 36px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * 技术路线切换器（SCANLAB precSYS / Novanta ARGES）
+ * 放在顶栏之下、页面最上方：两条路线的光路拓扑完全不同，
+ * 读者应当第一眼就知道这里可以切换、并且可以对照着看。
+ * ------------------------------------------------------------------ */
+#vendor-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 18px 4px;
+  background: #0a0f17;
+  border-bottom: 1px solid var(--line);
+}
+
+.vendor-switch-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.vendor-switch-caption b { color: #cfe0f5; }
+.vendor-switch-caption .dim { color: #7f8ea3; }
+
+.vendor-switch-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vendor-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 190px;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: #121b28;
+  color: #b9c8db;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+
+.vendor-button:hover { border-color: #3a5d84; }
+
+.vendor-button[aria-pressed='true'] {
+  border-color: #22d3ee;
+  background: #10222c;
+  color: #e8f6fb;
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, .25);
+}
+
+.vendor-name { font-size: 13px; font-weight: 600; }
+
+.vendor-sub {
+  font-size: 11px;
+  color: #7f8ea3;
+  line-height: 1.3;
+}
+
+/* Novanta 的位移轨迹俯视图面板 */
+.offset-view-host {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.offset-view-canvas {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #0b1218;
+}
+
+.offset-readout { margin-top: 6px; }
+
+.offset-readout .kv dt { font-size: 11px; }
+.offset-readout .kv dd { font-size: 11px; }
+
+.precession-values { margin: 6px 0; }
+.precession-values .kv dt { font-size: 11px; }
+.precession-values .kv dd { font-size: 11px; }
+
+/* 两条技术路线对照表：列宽要能放下整句说明 */
+.matrix.compare th:first-child { white-space: nowrap; }
+.matrix.compare td { text-align: left; line-height: 1.45; vertical-align: top; }
+.matrix.compare { font-size: 11px; }
+
+/* 状态色：与 SCANLAB 模式共用 .warn / .good 语义 */
+.panel-card p.good { color: #86efac; }
+.panel-card p.warn { color: #fca5a5; }
+
+@media (max-width: 900px) {
+  #vendor-switch { padding: 8px 12px 4px; }
+  .vendor-button { min-width: 0; flex: 1 1 160px; }
+  .offset-view-canvas { max-width: 200px; }
 }
