@@ -3,7 +3,14 @@
 [![在线演示](https://img.shields.io/badge/在线演示-打开页面-2ea44f?style=flat-square)](https://vforvan.github.io/precsys-optical-path-explorer/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-两套五轴（X / Y / Z / α / β）激光微加工扫描头的**教学型三维光路交互模型**，可以在页面顶部切换对照：
+本仓库有两个彼此独立的交付物：
+
+| 交付物 | 入口 | 内容 |
+|---|---|---|
+| **教学型光路对照模型**（在线版） | <https://vforvan.github.io/precsys-optical-path-explorer/> | 两套五轴（X / Y / Z / α / β）扫描头的教学型三维光路，页面顶部可切换对照 |
+| **五轴工程结构候选 V2**（离线单文件） | `engineering-dist/index.html`（双击即开） | 四个独立旋转振镜轴 + 一个单片透镜直线调焦轴，含完整光路、独立镜座与承载平台 |
+
+教学型光路模型支持的两条技术路线及各自的结构依据：
 
 | 技术路线 | 移束方式 | 结构依据 |
 |---|---|---|
@@ -548,17 +555,27 @@ AOI 是相对传播参考轴 **−Z** 的有符号角分量。工件水平时参
 
 ```text
 precsys-optical-path-explorer/
-├─ index.html                  页面骨架（顶栏 / 技术路线切换 / 视口 / 侧栏 / 控制栏）
+├─ index.html                  教学模型页面骨架（顶栏 / 技术路线切换 / 视口 / 侧栏 / 控制栏）
+├─ engineering.html            工程候选 V2 的开发入口（构建前直接跑这个）
 ├─ package.json  vite.config.ts  tsconfig.json
 ├─ .gitignore  .gitattributes  忽略构建中间产物 / 统一换行符
 ├─ LICENSE  NOTICE.md          MIT 正文 / 第三方组件与商标声明
-├─ docs/                       GitHub Pages 发布目录（构建产物，勿手改）
+├─ docs/                       教学模型的 GitHub Pages 发布目录（构建产物，勿手改）
+├─ engineering-dist/           工程候选 V2 的交付目录（**入库**，见 .gitignore 注释）
+│  ├─ index.html               自包含离线交互模型
+│  ├─ 结构说明.md              手写设计文档：结构选择 / 参数表 / 验证数据 / 待办
+│  ├─ *.glb                    GLB 装配模型（V2 两个姿态 + V1 历史版本）
+│  └─ *.json                   参数导出与两份验证报告
 ├─ public/references/README.md 资料目录说明
 ├─ tools/
-│  ├─ build-standalone.mjs     单文件构建 + 同步到 docs/
+│  ├─ build-standalone.mjs     教学模型单文件构建 + 同步到 docs/
+│  ├─ build-engineering.mjs    工程候选单文件构建（内联 JS/CSS → engineering-dist/）
 │  ├─ check-file-open.mjs      自检"双击打开"能否启动
 │  ├─ verify-demo.mjs          五种工艺预设与布局回归（浏览器）
 │  ├─ verify-novanta.mjs       Novanta 模式验收：平板/折射/进动/事实边界/切换（浏览器）
+│  ├─ verify-engineering.mjs   工程候选验收：±7°、进动、逆解、导出 GLB/JSON（浏览器）
+│  ├─ audit-aoi.mjs            AOI 联合目标数值验收 → aoi-validation-v2.json
+│  ├─ audit-engineering.mjs    小行程与联动姿态回归 → validation.json
 │  ├─ check-motors.mjs         电机显示角是否等于执行器角、是否装在镜片上
 │  ├─ check-mirror-response.mjs 电机角度是否真的反映到镜片姿态上
 │  ├─ screenshot.mjs           用 Playwright 生成页面截图（可选）
@@ -567,6 +584,13 @@ precsys-optical-path-explorer/
    ├─ main.ts                  入口：状态 → 追迹 → 场景 → 界面（两条路线在此分派）
    ├─ app-state.ts             两层状态（工程量 / 执行器量）、技术路线切换与快照
    ├─ styles.css
+   ├─ engineering/             工程候选 V2（与教学模型彼此独立）
+   │  ├─ main.ts               页面装配、交互绑定、导出 GLB/JSON
+   │  ├─ model.ts              五轴运动学模型与逆解
+   │  ├─ assembly.ts           光学件 / 镜座 / 电机 / 平台装配
+   │  ├─ process.ts            加工示例轨迹
+   │  ├─ process-view.ts       轨迹与去除视图
+   │  └─ style.css
    ├─ config/
    │  ├─ public-specs.ts       公开规格、资料来源、可信等级
    │  ├─ layout.ts             坐标约定、轴向布局、各模块等效几何（SCANLAB）
@@ -629,7 +653,7 @@ precsys-optical-path-explorer/
 
 ---
 
-## 8. 测试覆盖（`npm test`，189 个用例 / 15 个文件）
+## 8. 测试覆盖（`npm test`，199 个用例 / 17 个文件）
 
 ### 8.1 SCANLAB 模式（原有 85 个用例，全部保持通过）
 
@@ -672,6 +696,21 @@ precsys-optical-path-explorer/
 自动进动、8 个快捷视角、Top View 轨迹面板与非圆度读数、平板/望远镜部件卡参数、
 三类事实边界、两条路线对照表、已知未知清单、非圆度表述、**切换路线不残留上一套标签**、`执行器外形` 开关、**Z 轴演示时镜组真的在动**、切回 SCANLAB 仍正常。
 
+### 8.4 工程候选 V2（新增 10 个用例 / 2 个文件 + 浏览器验收）
+
+| 文件 / 命令 | 规模 | 覆盖内容 |
+|---|---|---|
+| `engineering.test.ts` | 7 个用例 | 零位姿态满足任务坐标、五轴独立驱动、**保留原有小行程 32 个组合角点的通光能力**、7° 倾角可与偏心焦点和 Z 调焦组合、扩大 R3 后仍通过实体遮挡检查 |
+| `engineering-process.test.ts` | 3 个用例 | `spiral` / `square` 加工示例的**全部轨迹点可逆解**、保持 AOI 范围、完成分层去除 |
+| `npm run audit:aoi`（`audit-aoi.mjs`） | 2,619 个目标 | XY 中心与半径 1.25 mm 圆周 8 点 × Z 三个高度 × 总 AOI 0°/3.5°/7°（方位全覆盖），逐一从零位逆解，检查目标误差、采样通光、实体遮挡与局部秩 5 |
+| `npm run verify:engineering` | 14 项浏览器检查 | 初始姿态、四种视角、±7° X/Y、恒定 7° 全方位进动、**AOI 分量组合超限时拒绝求解并保留原姿态**、7° 姿态 GLB 导出、M5 调焦、任务逆解收敛、不可达时如实报错、联动与暂停、六层显示开关、GLB/JSON 导出、**390 px 下无横向溢出** |
+
+> 关键数值（完整数据见 `engineering-dist/结构说明.md` 与两份 JSON 报告）：
+> 最小光学口径余量约 **1.283 mm**（已扣除 0.5 mm 余量）；
+> 最大电机绝对位移 M1 1.0251° / M2 1.3136° / M3 1.5212° / M4 1.4251° / M5 1.0559 mm，
+> 其中 **M3/M4 距机械限位仅剩约 0.079°/0.075°**，需结合真实跟随误差重新分配；
+> 归一化最大矩阵无穷范数条件数约 40.02（尺度与 V1 不同，不能直接比较精度）。
+
 ---
 
 ## 9. 已知的未知（页面"结构依据"模式内也列出）
@@ -711,7 +750,41 @@ precsys-optical-path-explorer/
 
 ---
 
-## 10. 免责声明
+## 10. 五轴工程结构候选 V2（本仓库第二个交付物）
+
+`engineering-dist/index.html` 可双击离线打开，包含**四个独立旋转振镜轴 + 一个单片透镜直线调焦轴**、
+完整光路、独立镜座和承载平台。已实现 ±7° AOI 与恒定 7° 全方位进动；
+**2,619 个联合目标**通过薄透镜模型下的逆解、采样通光和可控性检查。
+
+| 内容 | 位置 |
+|---|---|
+| 离线交互模型（自包含单文件） | `engineering-dist/index.html`（双击即开，无需服务器） |
+| 设计文档：结构选择、光路与驱动关系、参数表、验证数据、**尚需完成的工程工作** | [`engineering-dist/结构说明.md`](engineering-dist/结构说明.md) |
+| GLB 装配模型 ×3（含 V1 历史版本） | `engineering-dist/*.glb` |
+| 参数与验证报告 | `engineering-dist/*.json` |
+| 开发入口 / 构建 / 验收 | `engineering.html` / `npm run build:engineering` / `npm run verify:engineering` |
+
+**光路**：水平入光 → L1 → L2 → R1 → R2 → R3 → R4 → L3 → 工件。
+R1/R3 与 R2/R4 是前后分离的两组镜片，通过联合控制分别调节两个横向方向的位置与角度；
+各轴同时影响多个任务坐标，**不能把 M1～M5 简单等同于 X/Y/Z/α/β**。
+
+> ⚠️ **该候选不宣称优于其他方案，也不是加工级设计。** 它没有多镜共用可动支架；
+> 当前尺寸、焦距、行程与封装均为本次候选参数（不是厂商数据，也不是已选定零件规格）。
+>
+> - 透镜采用**近轴薄透镜模型**，绘制的厚度不参与厚透镜折射与像差计算，
+>   因此不把接近零的几何 RMS 当作真实焦斑尺寸或光学质量证明；
+> - 光线采样为两个半径环各 16 条加一条主光线，**不构成连续高斯光束包络的截光保证**；
+> - 射线遮挡检查**不能替代机械干涉分析**；离散采样所得最值不是可任意组合的五维工作域；
+> - 总 AOI 用 `atan2(√(dx²+dy²), −dz)`，参考工件 +Z 法线。α=β=7° 时总 AOI 约 **9.85°，不是 7°**；
+> - 本候选有效焦距为 **75 mm**，**不是** precSYS 的 25 mm。引用 ±7.0° 指标仅用于说明来源，
+>   不表示本模型达到该产品的焦斑、光谱、动态频率或精度。
+>
+> 仍需完成：真实激光参数与厚透镜处方、执行器选型与惯量/刚度/带宽核对、支座加劲与热管理、
+> 机械装配干涉与运动扫掠检查、连续工作域与像差误差预算。详见 `结构说明.md` 末节。
+
+---
+
+## 11. 免责声明
 
 本页仅供学习与沟通使用。所有光学关系都是基于公开资料建立的**教学等效模型**，
 不得作为设备选型、工艺参数、安全边界或验收依据。

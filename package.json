@@ -12,9 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "tsc --noEmit",
+    "build:engineering": "tsc --noEmit && node tools/build-engineering.mjs",
     "verify:page": "node tools/check-file-open.mjs",
     "verify:demo": "node tools/verify-demo.mjs",
-    "verify:novanta": "node tools/verify-novanta.mjs"
+    "verify:novanta": "node tools/verify-novanta.mjs",
+    "verify:engineering": "node tools/verify-engineering.mjs",
+    "audit:aoi": "node tools/audit-aoi.mjs",
+    "audit:engineering": "node tools/audit-engineering.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

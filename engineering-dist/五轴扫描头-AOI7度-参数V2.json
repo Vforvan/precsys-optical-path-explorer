@@ -1,0 +1,330 @@
+{
+  "units": "mm / deg",
+  "inputRadiusMm": 1.5,
+  "opticalModel": "3D reflection + paraxial thin lenses",
+  "design": {
+    "objectiveFocalLengthMm": 75,
+    "objectiveHeightMm": 75,
+    "maxAoiDeg": 7
+  },
+  "coordinates": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "optics": [
+    {
+      "id": "L1",
+      "label": "L1 · 单片移动负透镜",
+      "kind": "lens",
+      "center": {
+        "x": -285,
+        "y": -100,
+        "z": 180
+      },
+      "normal": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "radius": 12,
+      "thickness": 3,
+      "focalLength": -60,
+      "motor": 4
+    },
+    {
+      "id": "L2",
+      "label": "L2 · 独立固定准直透镜",
+      "kind": "lens",
+      "center": {
+        "x": -225,
+        "y": -100,
+        "z": 180
+      },
+      "normal": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "radius": 15,
+      "thickness": 4,
+      "focalLength": 120,
+      "motor": null
+    },
+    {
+      "id": "R1",
+      "label": "R1 · 前级水平转向",
+      "kind": "mirror",
+      "center": {
+        "x": -160,
+        "y": -100,
+        "z": 180
+      },
+      "normal": {
+        "x": -0.7071067811865475,
+        "y": 0.7071067811865475,
+        "z": 0
+      },
+      "axis": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "radius": 20,
+      "thickness": 3,
+      "motor": 0
+    },
+    {
+      "id": "R2",
+      "label": "R2 · 前级垂直转向",
+      "kind": "mirror",
+      "center": {
+        "x": -160,
+        "y": 50,
+        "z": 180
+      },
+      "normal": {
+        "x": 0.7071067811865475,
+        "y": -0.7071067811865475,
+        "z": 0
+      },
+      "axis": {
+        "x": 0.7071067811865475,
+        "y": 0.7071067811865475,
+        "z": 0
+      },
+      "radius": 20,
+      "thickness": 3,
+      "motor": 1
+    },
+    {
+      "id": "R3",
+      "label": "R3 · 后级水平转向",
+      "kind": "mirror",
+      "center": {
+        "x": 20,
+        "y": 50,
+        "z": 180
+      },
+      "normal": {
+        "x": -0.7071067811865475,
+        "y": 0.7071067811865475,
+        "z": 0
+      },
+      "axis": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "radius": 23,
+      "thickness": 3,
+      "motor": 2
+    },
+    {
+      "id": "R4",
+      "label": "R4 · 向下折转",
+      "kind": "mirror",
+      "center": {
+        "x": 20,
+        "y": 170,
+        "z": 180
+      },
+      "normal": {
+        "x": 0,
+        "y": -0.7071067811865475,
+        "z": -0.7071067811865475
+      },
+      "axis": {
+        "x": 1,
+        "y": 0,
+        "z": 0
+      },
+      "radius": 20,
+      "thickness": 3,
+      "motor": 3
+    },
+    {
+      "id": "L3",
+      "label": "L3 · 独立固定聚焦透镜",
+      "kind": "lens",
+      "center": {
+        "x": 20,
+        "y": 170,
+        "z": 75
+      },
+      "normal": {
+        "x": 0,
+        "y": 0,
+        "z": -1
+      },
+      "radius": 25,
+      "thickness": 5,
+      "focalLength": 75,
+      "motor": null
+    }
+  ],
+  "parts": [
+    {
+      "id": "L1",
+      "name": "L1 · 单片移动负透镜",
+      "role": "单电机驱动单片光学件",
+      "center": [
+        -285,
+        -100,
+        180
+      ],
+      "motor": "M5"
+    },
+    {
+      "id": "L2",
+      "name": "L2 · 独立固定准直透镜",
+      "role": "独立固定光学件",
+      "center": [
+        -225,
+        -100,
+        180
+      ],
+      "motor": null
+    },
+    {
+      "id": "R1",
+      "name": "R1 · 前级水平转向",
+      "role": "单电机驱动单片光学件",
+      "center": [
+        -160,
+        -100,
+        180
+      ],
+      "motor": "M1"
+    },
+    {
+      "id": "M1",
+      "name": "闭环旋转振镜电机（封装待选型）",
+      "role": "仅驱动 R1",
+      "center": [
+        -160,
+        -100,
+        234
+      ],
+      "motor": "M1"
+    },
+    {
+      "id": "R2",
+      "name": "R2 · 前级垂直转向",
+      "role": "单电机驱动单片光学件",
+      "center": [
+        -160,
+        50,
+        180
+      ],
+      "motor": "M2"
+    },
+    {
+      "id": "M2",
+      "name": "闭环旋转振镜电机（封装待选型）",
+      "role": "仅驱动 R2",
+      "center": [
+        -121.81623381592644,
+        88.18376618407356,
+        180
+      ],
+      "motor": "M2"
+    },
+    {
+      "id": "R3",
+      "name": "R3 · 后级水平转向",
+      "role": "单电机驱动单片光学件",
+      "center": [
+        20,
+        50,
+        180
+      ],
+      "motor": "M3"
+    },
+    {
+      "id": "M3",
+      "name": "闭环旋转振镜电机（封装待选型）",
+      "role": "仅驱动 R3",
+      "center": [
+        20,
+        50,
+        234
+      ],
+      "motor": "M3"
+    },
+    {
+      "id": "R4",
+      "name": "R4 · 向下折转",
+      "role": "单电机驱动单片光学件",
+      "center": [
+        20,
+        170,
+        180
+      ],
+      "motor": "M4"
+    },
+    {
+      "id": "M4",
+      "name": "闭环旋转振镜电机（封装待选型）",
+      "role": "仅驱动 R4",
+      "center": [
+        92,
+        170,
+        180
+      ],
+      "motor": "M4"
+    },
+    {
+      "id": "L3",
+      "name": "L3 · 独立固定聚焦透镜",
+      "role": "独立固定光学件",
+      "center": [
+        20,
+        170,
+        75
+      ],
+      "motor": null
+    },
+    {
+      "id": "M5",
+      "name": "直线电机调焦轴（编码反馈）",
+      "role": "只移动 L1；±1.5 mm",
+      "center": [
+        -285,
+        -100,
+        121
+      ],
+      "motor": "M5"
+    }
+  ],
+  "validation": {
+    "q": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "output": [
+      3.552713678800501e-14,
+      5.684341886080802e-14,
+      0,
+      -9.39747889883087e-14,
+      -8.990367899603539e-15
+    ],
+    "aoiDeg": 9.440385416055515e-14,
+    "aoiInRange": true,
+    "apertureMargin": 9.999999999999998,
+    "rmsMm": 2.861533888702719e-14,
+    "rank": 5,
+    "condition": 37.137066571339176,
+    "blocked": [],
+    "errors": [],
+    "valid": true,
+    "physicalMotors": 5,
+    "independentMovingOptics": 5,
+    "modelBoundary": "V2：AOI 7° 薄透镜近轴模型；机械包络设计；尚未形成加工级设计或动态稳定性验证"
+  }
+}

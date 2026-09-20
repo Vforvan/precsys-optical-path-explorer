@@ -4,6 +4,23 @@ node_modules/
 # 构建中间产物
 dist/
 
+# 说明：engineering-dist/ 与 docs/ 一样是"产物目录"，但**故意纳入版本管理**。
+#
+# engineering-dist/ 是 npm run build:engineering 的输出，同时也是该候选结构的
+# **交付目录**：结构说明.md（手写设计文档）、三个 GLB 装配模型、参数与验证报告
+# 都在这里。因此这里**不能**把 engineering-dist/ 忽略掉。
+#
+# 注意与 dist/ 的区别：`dist/` 是纯中间产物（可随时重建、不入库），
+# `engineering-dist/` 是要给别人拿走的东西。两者名字相似但用途不同，
+# 以后若调整构建输出路径，别顺手把它并进 dist/。
+#
+# 其中的 V2 GLB / 参数 / 验证报告可由以下命令重现（约 4.5 MB）：
+#   npm run build:engineering     → index.html
+#   npm run verify:engineering    → 两个 V2 GLB + 参数 JSON（走浏览器导出按钮）
+#   node tools/audit-aoi.mjs      → aoi-validation-v2.json
+#   node tools/audit-engineering.mjs → validation.json
+# 每次重跑都会改动这些二进制/报告文件，提交时请确认 diff 是预期的。
+#
 # 过程截图（约 9 MB，只在本地用于回归比对）
 screenshots/
 

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>五轴扫描头 · 工程结构工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b3045'/%3E%3Cpath d='M7 9h18L7 23h18' fill='none' stroke='%235ad8e6' stroke-width='3'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./src/engineering/style.css" />
+</head>
+<body>
+  <header><div class="logo">5</div><div><h1>五轴扫描头 <span>/ 工程结构工作台</span></h1><p>四片独立振镜 + 单片直线调焦 · V2 / AOI ±7.0° · 加工示例</p></div><div class="header-status"><i></i>本地交互模型 <b>2026.09</b></div></header>
+  <main>
+    <aside>
+      <div class="section-title"><span>01 / 结构约束</span><b class="tag">5 个实体轴</b></div>
+      <div class="constraint-grid"><div><strong>04</strong><span>旋转振镜电机</span></div><div><strong>01</strong><span>直线调焦电机</span></div></div>
+      <p class="brief">每个电机只驱动一片光学件。固定镜片独立安装于静止平台，无多镜共用可动支架。</p>
+      <div class="section-title"><span>加工示例 / 几何演示</span></div>
+      <div class="process-buttons"><button id="process-spiral" data-process="spiral">◎ 螺旋钻孔</button><button id="process-square" data-process="square">□ 正方形孔</button></div>
+      <p class="muted">选择后自动预求解并播放。下方局部放大图显示分层去除与截面；实体光路始终按真实电机坐标更新。</p>
+      <section class="aoi-card" aria-label="AOI 控制">
+        <div class="aoi-heading"><span>实际总 AOI</span><strong id="aoi-actual">0.0000°</strong></div>
+        <div class="axis-head"><b>有符号 AOI / 方位角</b><output id="aoi-command">0.0° / 0°</output></div>
+        <input id="aoi-angle" type="range" aria-label="有符号 AOI" min="-7" max="7" step="0.1" value="0">
+        <div class="axis-range"><span>−7.0°</span><span>+7.0°</span></div>
+        <input id="aoi-azimuth" type="range" aria-label="入射方位角" min="0" max="360" step="1" value="0">
+        <div class="axis-range"><span>方位 0°</span><span>360°</span></div>
+        <div class="aoi-presets"><button data-aoi="-7">−7° X</button><button data-aoi="7">+7° X</button><button data-aoi="-7" data-azimuth="90">−7° Y</button><button data-aoi="7" data-azimuth="90">+7° Y</button></div>
+        <button id="aoi-demo">▶ 7° 全方位进动</button>
+        <p class="muted">此组操作保持焦点 X/Y/Z = 0。总 AOI 是相对工件法线的夹角；正负表示相反的子午倾斜方向。α、β 同为 7° 时总 AOI 约 9.85°，会被拒绝。</p>
+      </section>
+      <div class="section-title"><span>02 / 电机控制</span><button id="reset">全部归零</button></div>
+      <div id="sliders"></div>
+      <div class="demo-row"><button id="demo">▶ 五轴联动</button><span>慢速运动示意</span></div>
+      <details><summary>任务坐标逆解</summary><p class="muted">位置单位 mm，角度单位 °。候选联合验证域：XY 直径 2.5 mm、Z ±0.4 mm、总 AOI ≤7°。任意电机极限组合并不保证通光。</p><div id="targets"></div><button id="solve">求解并定位</button></details><p id="solve-status" aria-live="polite"></p>
+      <div class="section-title"><span>03 / 部件显示</span></div>
+      <div id="visibility"></div>
+      <div class="section-title"><span>04 / 模型交付</span></div>
+      <div class="export-row"><button id="export-glb">导出 GLB</button><button id="export-json">导出参数</button></div>
+      <p class="muted">GLB 为结构网格，单位 m；参数文件为 mm。未形成加工级 CAD 或光学处方。</p>
+    </aside>
+    <section class="workspace">
+      <div class="view-toolbar"><div class="view-buttons"><button data-view="iso" class="active">立体总览</button><button data-view="top">俯视光路</button><button data-view="front">前视结构</button><button data-view="focus">调焦特写</button></div><span>鼠标旋转 · 滚轮缩放 · 右键平移</span></div>
+      <div id="viewport"><div id="boot">正在加载三维装配…</div><div class="scene-caption"><b>光学平台 560 × 450 mm</b><span>实际比例 · 7 片独立光学件 · 固定工件</span></div><a class="process-inset" id="process-inset-box" href="#process-panel" hidden><b id="process-inset-title">加工局部放大</b><canvas id="process-inset" width="340" height="362"></canvas><span>独立放大 · 点击查看进度与截面</span></a><div class="legend"><span class="beam-dot"></span>主光线 <span class="glass-dot"></span>独立光学件 <span class="motor-dot"></span>电机</div></div>
+      <div class="readouts" id="readouts"></div><a class="angle-jump" href="#angle-lesson">α、β 各代表什么？查看投影示意 ↓</a>
+      <div class="audit"><div><span class="eyebrow">当前姿态校验</span><h2 id="audit-title">计算中</h2><p id="audit-detail"></p></div><div class="audit-metrics" id="audit-metrics"></div></div>
+      <section class="process-panel" id="process-panel" aria-label="加工局部放大">
+        <div class="process-copy"><span class="eyebrow">加工局部放大 / 单位 mm</span><h2 id="process-title">选择一个加工示例</h2><p id="process-description">从左侧选择螺旋钻孔或正方形孔，观察实际逆解焦点、分层扫描和几何去除。局部视图独立放大，不改变整机几何。</p><div class="process-actions"><button id="process-play" disabled>▶ 继续</button><button id="process-restart" disabled>↻ 重新加工</button><strong id="process-percent">0%</strong></div><input id="process-progress" type="range" min="0" max="1" step="0.001" value="0" aria-label="加工进度" disabled><p id="process-status" aria-live="polite">尚未开始</p><div class="depth-readout">当前最大示意深度 <strong id="process-depth">0.00 mm</strong></div><p class="muted">两例均为约 1.20 mm 孔形、3 层、0.30 mm 深的盲孔示意。几何作用半径取 0.06 mm，用于演示路径覆盖，不是实际焦斑、材料去除率或工艺处方。方孔的有限作用半径会留下圆角；实际转角需规划减速。换层关光，暂停保留结果，重加工或切换示例清空结果。主视图光线表示光路参考，不代表激光已开启。</p></div>
+        <canvas id="process-canvas" width="620" height="456" aria-label="加工俯视与截面几何去除预览"></canvas>
+      </section>
+      <section class="angle-lesson" id="angle-lesson" aria-label="α与β角说明">
+        <div class="lesson-heading"><span class="eyebrow">理解五轴中的两个方向坐标</span><h2>α、β 是光束方向的两个投影角，都是焦点处的量</h2><p>本页采用世界坐标：工件表面为 XY 平面，+Z 从工件指向扫描头；光束向下传播，参考方向是 −Z。α、β 不是两台电机的机械转角，也不是先后执行的欧拉角。</p></div>
+        <div class="angle-cards">
+          <article><div class="angle-card-title"><h3>α 角 · 看 XZ 平面</h3><strong id="alpha-live">0.000°</strong></div><svg viewBox="0 0 300 150" role="img" aria-label="α为光束在XZ平面投影与负Z方向的夹角，向正X偏为正"><defs><marker id="arrow-alpha" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="#ffbd79"/></marker></defs><path d="M60 25V130M60 130H260" fill="none" stroke="#6b8aa2"/><path d="M130 20V130" stroke="#6b8aa2" stroke-dasharray="5 4"/><path d="M130 20L200 118" stroke="#ffbd79" stroke-width="3" marker-end="url(#arrow-alpha)"/><path d="M130 68Q146 68 158 59" fill="none" stroke="#70d7de" stroke-width="2"/><text x="40" y="25">+Z</text><text x="263" y="135">+X</text><text x="103" y="145">−Z</text><text x="151" y="90">+α</text><text x="201" y="60">传播方向</text></svg><p>把出射光线投影到 <b>XZ 平面</b>，与 −Z 的有符号夹角就是 α。传播时向 +X 偏：α&gt;0；向 −X 偏：α&lt;0。</p><code>α = atan2(dₓ, −d_z)</code><button data-aoi="3" data-azimuth="0">演示 α=+3°、β=0°</button></article>
+          <article><div class="angle-card-title"><h3>β 角 · 看 YZ 平面</h3><strong id="beta-live">0.000°</strong></div><svg viewBox="0 0 300 150" role="img" aria-label="β为光束在YZ平面投影与负Z方向的夹角，向正Y偏为正"><defs><marker id="arrow-beta" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="#ffbd79"/></marker></defs><path d="M60 25V130M60 130H260" fill="none" stroke="#6b8aa2"/><path d="M130 20V130" stroke="#6b8aa2" stroke-dasharray="5 4"/><path d="M130 20L200 118" stroke="#ffbd79" stroke-width="3" marker-end="url(#arrow-beta)"/><path d="M130 68Q146 68 158 59" fill="none" stroke="#70d7de" stroke-width="2"/><text x="40" y="25">+Z</text><text x="263" y="135">+Y</text><text x="103" y="145">−Z</text><text x="151" y="90">+β</text><text x="201" y="60">传播方向</text></svg><p>把出射光线投影到 <b>YZ 平面</b>，与 −Z 的有符号夹角就是 β。传播时向 +Y 偏：β&gt;0；向 −Y 偏：β&lt;0。</p><code>β = atan2(dᵧ, −d_z)</code><button data-aoi="3" data-azimuth="90">演示 β=+3°、α=0°</button></article>
+        </div>
+        <p class="angle-formula"><b>总 AOI</b> 才是光束与工件法线的实际夹角：<code>AOI = atan(√(tan²α + tan²β))</code>。例如 α=7°、β=0° 时 AOI=7°；α=β≈4.962° 时 AOI=7°；α=β=7° 时 AOI≈9.85°，超过本版限制。</p>
+        <p class="muted">图为正方向示意，不按当前角度比例绘制；右上数值随实际模型更新。螺旋例在 3° 倾角下绕方位旋转，因此 α、β 交替变化；方孔例保持 α=β=0°，四片振镜仍需联动以移动焦点并保持竖直光束。若工件倾斜，需用实际表面法线重算 AOI。</p>
+      </section>
+      <details class="engineering-notes"><summary>结构清单与验证边界</summary><p>入光 → L1 移动负透镜 → L2 固定准直透镜 → R1 → R2 → R3 → R4 → L3 固定聚焦透镜 → 工件。R1/R3 与 R2/R4 成对提供位置与方向控制，输出通过联合逆解计算。V2：L3 设计焦距与高度由 100 改为 75 mm；R3 净口径由 40 改为 46 mm，独立镜座与轴端连接同步调整。</p><div id="bom"></div><p>全部尺寸为本次候选设计参数，电机外壳为选型占位。反射采用三维几何；透镜采用薄透镜近轴模型，绘制厚度仅用于结构表达。双环 32 条采样光线不等于连续光束、衍射或像差验收；RMS 是几何弥散，不能作为真实焦斑尺寸。支座遮挡检查不等于全机械干涉和动态稳定性认证。扩大 R3 会增加运动惯量，真实带宽尚待核验。</p><p>后续需要：激光参数、真实透镜处方、镀膜/损伤阈值、执行器惯量和带宽、装调公差、热漂移与闭环标定。当前尚未完成样机验证。</p><p>AOI 目标参考：<a href="https://www.scanlab.de/sites/default/files/2026-03/SCANLAB-precSYS-EN.pdf" target="_blank" rel="noreferrer">precSYS 规格表第 8 页</a>中 ±7.0° * 对应 515 nm 最小焦斑配置，* 表示激光光谱带宽 &lt;1.5 nm。本模型不继承厂商的焦斑、精度、650 Hz 频率或光谱性能；本模型有效焦距为 75 mm，不是该产品的 25 mm。调焦机制参考：<a href="https://www.scanlab.de/sites/default/files/2020-07/10_varioSCAN%2BvarioSCANde_focusing%20systems.pdf" target="_blank" rel="noreferrer">SCANLAB 直线移动发散光学件说明</a>。</p></details>
+    </section>
+  </main>
+  <script type="module" src="./src/engineering/main.ts"></script>
+</body>
+</html>
+
