@@ -12,6 +12,8 @@ export class MaterialDetail {
   private dot = new Mesh(new SphereGeometry(0.045, 12, 8), new MeshBasicMaterial({ color: '#ff9f55' }));
   private stats: HTMLElement;
   private elapsed = 0;
+  /** 已建网格对应的材料版本号；相同则不必重建几何。 */
+  private meshRevision = -1;
 
   constructor(private workpiece: WorkpieceView) {
     const root = document.getElementById('material-detail')!;
@@ -52,9 +54,16 @@ export class MaterialDetail {
 
   update(snapshot: AppSnapshot, seconds: number): void {
     this.elapsed += seconds;
+    // 0.22 s 一次是"读数刷新"的节奏；但几何只在材料**真的变了**才重建
+    // （revision 由 MaterialRemoval 在去除发生时递增）。
+    // 早先这里无条件调 refreshMesh()，虽然内部有 revision 去重不会白建，
+    // 但把节流放外层更直白，也避免每帧都做一次多余的调用。
     if (this.elapsed > 0.22) {
-      this.workpiece.refreshMesh();
       const stats = this.workpiece.material.stats();
+      if (stats.revision !== this.meshRevision) {
+        this.workpiece.refreshMesh();
+        this.meshRevision = stats.revision;
+      }
       this.stats.textContent = `已去除 ${stats.volumeMm3.toFixed(4)} mm³ · 最大深度 ${stats.maxDepthMm.toFixed(2)} mm`;
       this.elapsed = 0;
     }
