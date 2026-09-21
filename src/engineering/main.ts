@@ -2,7 +2,7 @@ import { AmbientLight, AxesHelper, Color, DirectionalLight, GridHelper, Group, M
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { buildAssembly, beamLines, mechanicalObstructions, type Assembly } from './assembly';
+import { buildAssembly, buildBeam, labelPositions, mechanicalObstructions, updateAssembly, updateBeam, type Assembly } from './assembly';
 import { aoiFromDirection, aoiTarget, controllability, evaluate, inverse, LIMITS, OPTICAL_DESIGN, opticsAt, type Coordinates } from './model';
 import { ProcessPlayer } from './process-view';
 import type { ProcessKind } from './process';
@@ -27,8 +27,12 @@ Object.assign(labelRenderer.domElement.style, { position: 'absolute', inset: '0'
 viewport.appendChild(labelRenderer.domElement);
 let labelGroup = new Group(); scene.add(labelGroup);
 let q: Coordinates = [0, 0, 0, 0, 0];
-let assembly: Assembly;
-let beam = new Group();
+let assembly: Assembly | undefined;
+let beam: Group = new Group();
+/** 标签 DOM 只建一次；之后只改位置与文本。 */
+const labelObjects: { element: HTMLDivElement; object: CSS2DObject; label: Assembly['labels'][number] }[] = [];
+/** 通光遮挡检查用的独立装配体，惰性建立后复用（不进场景）。 */
+let probe: Assembly | undefined;
 let playing = false;
 let conePlaying = false;
 let startedAt = 0;
@@ -43,41 +47,63 @@ const outputs = ['X 焦点', 'Y 焦点', 'Z 焦点', 'α · XZ 投影角', 'β �
 
 function stop(): void { playing = false; conePlaying = false; processPlayer?.pause(); $('demo').textContent = '▶ 五轴联动'; $('aoi-demo').textContent = '▶ 7° 全方位进动'; }
 
-function disposeGroup(group: Group): void {
-  const materials = new Set<Mesh['material']>();
-  group.traverse(object => {
-    const mesh = object as Mesh;
-    mesh.geometry?.dispose();
-    if (mesh.material) materials.add(mesh.material);
-    const label = object as CSS2DObject;
-    label.element?.remove();
-  });
-  for (const entry of materials) for (const material of Array.isArray(entry) ? entry : [entry]) material.dispose();
-  group.removeFromParent();
+/**
+ * 取一个更新到给定姿态的"探针装配体"，用于通光遮挡检查。
+ *
+ * 为什么不直接用显示用的那个：检查要在**提交显示之前**完成，
+ * 若被遮挡则保留原姿态、画面不动；借用显示装配体会让画面先跳到新姿态再回退。
+ * 探针不进场景（不参与渲染），只用于射线求交。
+ */
+function probeAssembly(values: Coordinates): Assembly {
+  if (!probe) probe = buildAssembly();
+  updateAssembly(values, probe);
+  return probe;
 }
 
+/**
+ * 图层开关。只在装配体已建立后生效 —— `applyVisibility()` 在 `update()` 之前
+ * 就被初始化代码调用过一次，那时装配体还不存在。
+ */
 function applyVisibility(): void {
-  for (const key of ['optics', 'motors', 'structure', 'platform'] as const) assembly[key].visible = visibility[key];
+  if (!assembly) return;
+  const model = assembly;
+  for (const key of ['optics', 'motors', 'structure', 'platform'] as const) model[key].visible = visibility[key];
   beam.visible = visibility.beam; focusMarker.visible = visibility.beam && lastReport.output !== null;
   labelGroup.visible = visibility.labels;
   labelRenderer.domElement.style.visibility = visibility.labels ? 'visible' : 'hidden';
 }
 
 function update(): void {
-  if (assembly) disposeGroup(assembly.root);
-  disposeGroup(beam); disposeGroup(labelGroup);
-  assembly = buildAssembly(q); scene.add(assembly.root);
+  if (!assembly) {
+    // ---- 首帧：建一次静态结构、光束与标签 DOM ----
+    assembly = buildAssembly();
+    scene.add(assembly.root);
+    // 光路按最大点数预分配，之后只改顶点值、不重建几何
+    beam = buildBeam();
+    scene.add(beam);
+    labelGroup = new Group(); scene.add(labelGroup);
+    for (const label of assembly.labels) {
+      const element = document.createElement('div'); element.className = `part-label${label.motor ? ' motor' : ''}`; element.textContent = label.text;
+      const object = new CSS2DObject(element); object.position.copy(label.position); labelGroup.add(object);
+      labelObjects.push({ element, object, label });
+    }
+  }
+
+  // ---- 之后每次都只是更新，不再 dispose/重建 ----
   const result = evaluate(q);
-  const blocked = mechanicalObstructions(assembly, result);
+  // 通光遮挡检查要在**提交显示之前**做：若被遮挡则保留原姿态，画面不动
+  const probe = probeAssembly(q);
+  const blocked = mechanicalObstructions(probe, result);
+  const current = updateAssembly(q, assembly);
+  updateBeam(beam, result);
+  // 光学件标签跟着镜心走（其余标签位置固定）
+  for (const { label, position } of labelPositions(assembly, current)) {
+    const entry = labelObjects.find((item) => item.label === label);
+    if (entry) entry.object.position.copy(position);
+  }
   const capability = controllability(q);
   const aoi = result.output ? aoiFromDirection(result.chief.direction) : null;
   const aoiInRange = aoi !== null && aoi <= OPTICAL_DESIGN.maxAoiDeg + 1e-5;
-  beam = beamLines(result); scene.add(beam);
-  labelGroup = new Group(); scene.add(labelGroup);
-  for (const label of assembly.labels) {
-    const element = document.createElement('div'); element.className = `part-label${label.motor ? ' motor' : ''}`; element.textContent = label.text;
-    const object = new CSS2DObject(element); object.position.copy(label.position); labelGroup.add(object);
-  }
   if (result.focus) focusMarker.position.copy(result.focus);
   focusMarker.visible = !!result.focus;
   for (let i = 0; i < 5; i++) {
@@ -117,6 +143,7 @@ function download(blob: Blob, filename: string): void {
 
 async function exportGlb(): Promise<void> {
   stop();
+  if (!assembly) return;   // 装配体在首帧 update() 时建立；导出按钮只可能在之后可点
   const group = new Group(); group.name = 'Engineering_candidate_units_m';
   const model = assembly.root.clone(true); model.traverse(object => { object.visible = true; });
   const opticalPath = beam.clone(true); opticalPath.traverse(object => { object.visible = true; });
@@ -134,9 +161,8 @@ function moveToTarget(target: Coordinates): boolean {
   if (!solution.ok) solution = inverse(target);
   if (!solution.ok) { $('solve-status').textContent = `未找到行程内解，残差 ${solution.residual.toPrecision(3)}；保留原姿态。`; return false; }
   const result = evaluate(solution.q);
-  const candidate = buildAssembly(solution.q);
-  const blocked = mechanicalObstructions(candidate, result);
-  disposeGroup(candidate.root);
+  // 复用探针装配体做遮挡检查，不再每次新建一棵场景再销毁
+  const blocked = mechanicalObstructions(probeAssembly(solution.q), result);
   if (result.errors.length || blocked.length) { $('solve-status').textContent = `目标存在光路限制：${[...result.errors, ...blocked].join('、')}；保留原姿态。`; return false; }
   q = solution.q; update();
   target.forEach((n, i) => { $<HTMLInputElement>(`target-${i}`).value = n.toFixed(6); });
@@ -181,7 +207,7 @@ for (const [key, label] of Object.entries({ optics: '独立镜片', motors: '5 �
 $('reset').onclick = () => { stop(); q = [0, 0, 0, 0, 0]; $('solve-status').textContent = ''; $<HTMLInputElement>('aoi-angle').value = '0'; $<HTMLInputElement>('aoi-azimuth').value = '0'; $('aoi-command').textContent = '0.0° / 0°'; update(); };
 $('demo').onclick = () => { const start = !playing; stop(); playing = start; startedAt = performance.now(); $('demo').textContent = playing ? 'Ⅱ 暂停联动' : '▶ 五轴联动'; };
 document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(button => { button.onclick = () => setView(button.dataset.view!); });
-$('export-json').onclick = () => download(new Blob([JSON.stringify({ units: 'mm / deg', inputRadiusMm: 1.5, opticalModel: '3D reflection + paraxial thin lenses', design: OPTICAL_DESIGN, coordinates: q, optics: opticsAt(q), parts: assembly.parts, validation: lastReport }, null, 2)], { type: 'application/json' }), '五轴扫描头-AOI7度-参数V2.json');
+$('export-json').onclick = () => { if (!assembly) return; download(new Blob([JSON.stringify({ units: 'mm / deg', inputRadiusMm: 1.5, opticalModel: '3D reflection + paraxial thin lenses', design: OPTICAL_DESIGN, coordinates: q, optics: opticsAt(q), parts: assembly.parts, validation: lastReport }, null, 2)], { type: 'application/json' }), '五轴扫描头-AOI7度-参数V2.json'); };
 $('export-glb').onclick = () => { exportGlb().catch(error => { $('audit-title').textContent = `导出失败：${String(error)}`; }); };
 new ResizeObserver(() => { const width = viewport.clientWidth, height = viewport.clientHeight; renderer.setSize(width, height); labelRenderer.setSize(width, height); camera.aspect = width / height; camera.fov = width < 720 ? 49 : 39; camera.updateProjectionMatrix(); }).observe(viewport);
 update(); setView('iso'); $('boot').remove();

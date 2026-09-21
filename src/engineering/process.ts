@@ -74,9 +74,17 @@ export class RemovalPreview {
   readonly size = 128;
   readonly extent = 0.9;
   readonly depth = new Float32Array(this.size * this.size);
+  /**
+   * 栅格版本号：每次实际改动 depth 就递增。
+   * 供渲染方判断"孔形有没有变"，避免每帧重绘到 canvas。
+   */
+  private version = 0;
   private previous: ProcessFrame | null = null;
 
-  reset(): void { this.depth.fill(0); this.previous = null; }
+  /** 当前版本号（只读）。 */
+  get revision(): number { return this.version; }
+
+  reset(): void { this.depth.fill(0); this.previous = null; this.version++; }
 
   apply(frame: ProcessFrame): void {
     if (!frame.laserOn) { this.previous = null; return; }
@@ -85,6 +93,7 @@ export class RemovalPreview {
     const steps = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) / 0.008));
     for (let i = 0; i <= steps; i++) this.stamp(start[0] + (end[0] - start[0]) * i / steps, start[1] + (end[1] - start[1]) * i / steps, Math.max(0, -end[2]));
     this.previous = frame;
+    this.version++;
   }
 
   private stamp(x: number, y: number, depth: number): void {
