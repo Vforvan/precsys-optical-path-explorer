@@ -1,8 +1,23 @@
-import { Vector3 } from 'three';
+﻿import { Vector3 } from 'three';
 
 export type Coordinates = [number, number, number, number, number];
-export const LIMITS: Coordinates = [1.2, 1.6, 1.6, 1.5, 1.5];
-export const OPTICAL_DESIGN = { objectiveFocalLengthMm: 75, objectiveHeightMm: 75, maxAoiDeg: 7 } as const;
+export const LIMITS: Coordinates = [1.2, 1.6, 1.6, 1.5, 2.555];
+export const OPTICAL_DESIGN = {
+  /** 物镜（L3）焦距 mm。公开值。 */
+  objectiveFocalLengthMm: 75,
+  /** 物镜所在高度 mm（工件表面 z=0 之上）。 */
+  objectiveHeightMm: 75,
+  /** 可接受的方位角上限（度）。 */
+  maxAoiDeg: 7,
+  /** L1 单片移动负透镜焦距 mm（负）。 */
+  l1FocalLengthMm: -60,
+  /** L2 固定准直透镜焦距 mm。 */
+  l2FocalLengthMm: 120,
+  /** L1 与 L2 的零位间隔 mm。 */
+  l1l2GapMm: 60,
+  /** L2 的轴向位置 mm（固定不动，其余几何在此之上推算）。 */
+  l2AxisMm: -225,
+} as const;
 export const RAD = Math.PI / 180;
 const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
 
@@ -27,9 +42,14 @@ export const MIRRORS: Optic[] = [
 ];
 
 export function opticsAt(q: Coordinates): Optic[] {
+  const { l1FocalLengthMm, l2FocalLengthMm, l1l2GapMm, l2AxisMm } = OPTICAL_DESIGN;
+  // L1 在 L2 上游 gap 处；两者同一光轴高度。
+  // Z 调焦灵敏度与 1/d1² 成正比（L1 不折射主光线，它只改变光线打到 L2 的高度），
+  // 因此 d1 是调焦行程的主要设计自由度。
+  const l1AxisMm = l2AxisMm - l1l2GapMm;
   return [
-    { id: 'L1', label: 'L1 · 单片移动负透镜', kind: 'lens', center: v(-285 + q[4], -100, 180), normal: v(1, 0, 0), radius: 12, thickness: 3, focalLength: -60, motor: 4 },
-    { id: 'L2', label: 'L2 · 独立固定准直透镜', kind: 'lens', center: v(-225, -100, 180), normal: v(1, 0, 0), radius: 15, thickness: 4, focalLength: 120, motor: null },
+    { id: 'L1', label: 'L1 · 单片移动负透镜', kind: 'lens', center: v(l1AxisMm + q[4], -100, 180), normal: v(1, 0, 0), radius: 12, thickness: 3, focalLength: l1FocalLengthMm, motor: 4 },
+    { id: 'L2', label: 'L2 · 独立固定准直透镜', kind: 'lens', center: v(l2AxisMm, -100, 180), normal: v(1, 0, 0), radius: 15, thickness: 4, focalLength: l2FocalLengthMm, motor: null },
     ...MIRRORS.map((optic, i) => ({ ...optic, center: optic.center.clone(), normal: optic.normal.clone().applyAxisAngle(optic.axis!, q[i] * RAD) })),
     { id: 'L3', label: 'L3 · 独立固定聚焦透镜', kind: 'lens', center: v(20, 170, OPTICAL_DESIGN.objectiveHeightMm), normal: v(0, 0, -1), radius: 25, thickness: 5, focalLength: OPTICAL_DESIGN.objectiveFocalLengthMm, motor: null },
   ];
