@@ -18,7 +18,9 @@
     "verify:novanta": "node tools/verify-novanta.mjs",
     "verify:engineering": "node tools/verify-engineering.mjs",
     "audit:aoi": "node tools/audit-aoi.mjs",
-    "audit:engineering": "node tools/audit-engineering.mjs"
+    "audit:engineering": "node tools/audit-engineering.mjs",
+    "check:motors": "node tools/check-motors.mjs",
+    "check:mirror-response": "node tools/check-mirror-response.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

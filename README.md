@@ -114,12 +114,26 @@ npm run dev        # 开发服务器（默认 http://localhost:5173）
 npm run build      # 生成单文件 dist/index.html（tsc 类型检查 + 构建 + 内联），并同步到 docs/
 npm run build:split# 生成传统分离文件版（需要本地服务器）
 npm run preview    # 本地预览构建产物
-npm test           # 运行 Vitest 单元测试（186 个用例 / 15 个文件）
+npm test           # 运行 Vitest 单元测试（206 个用例 / 18 个文件）
 npm run check      # 只做 TypeScript 类型检查
-npm run verify:page# 用真实浏览器自检"双击打开"能否正常启动（需要 Edge/Chrome）
-npm run verify:demo# 五种工艺预设、暂停/复位、爆炸视图与响应式布局回归
-npm run verify:novanta # Novanta 模式浏览器验收（39 项：平板/折射/进动/Z 轴演示/事实边界/切换）
 ```
+
+**浏览器验收与核对**（都需要本机装有 Edge 或 Chrome，全部走 `file://`，与用户双击打开的方式一致）：
+
+```bash
+npm run build:engineering  # 工程候选单文件构建（只改 src/engineering/ 时也要跑 npm run build 才会发布）
+npm run verify:page       # 自检"双击打开"能否正常启动
+npm run verify:demo       # 五种工艺预设、暂停/复位、爆炸视图与响应式布局回归
+npm run verify:novanta    # Novanta 模式验收（39 项：平板/折射/进动/Z 轴演示/事实边界/切换）
+npm run verify:engineering# 工程候选验收（初始姿态/四种视角/±7°/进动/逆解/导出/390px）
+npm run audit:aoi         # AOI 联合目标数值验收 → engineering-dist/aoi-validation-v2.json
+npm run audit:engineering # 小行程与联动姿态回归 → engineering-dist/validation.json
+npm run check:motors      # 执行器绑定：振镜显示角 = 执行器角、镜片实际转角一致、转轴穿过镜心、Z 行程一致
+npm run check:mirror-response # 响应核对：Z 命令下只移动 z-l1/z-l3，固定件保持不动
+```
+
+> ⚠️ **改了 `src/engineering/` 之后必须跑 `npm run build`，不能只跑 `npm run build:engineering`**：
+> `docs/`（GitHub Pages 的发布源）的同步只在 `npm run build` 里执行，否则线上仍是旧产物。
 
 ### 在线版与发布方式
 
@@ -593,7 +607,8 @@ precsys-optical-path-explorer/
 │  ├─ verify-engineering.mjs   工程候选验收：±7°、进动、逆解、导出 GLB/JSON（浏览器）
 │  ├─ audit-aoi.mjs            AOI 联合目标数值验收 → aoi-validation-v2.json
 │  ├─ audit-engineering.mjs    小行程与联动姿态回归 → validation.json
-│  ├─ check-motors.mjs         电机显示角是否等于执行器角、是否装在镜片上
+│  ├─ check-motors.mjs         执行器绑定核对：振镜显示角 = 执行器角、镜片实际转角一致、
+│  │                            转轴穿过镜心、Z 直线台行程 = 快照 zTravelMm（失败即退出码 1）
 │  ├─ check-mirror-response.mjs 电机角度是否真的反映到镜片姿态上
 │  ├─ screenshot.mjs           用 Playwright 生成页面截图（可选）
 │  └─ diagnose-occlusion.mjs   逐个隐藏分组排查"什么东西挡住了画面"
